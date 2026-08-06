@@ -1,0 +1,17 @@
+node_modules/
+dist/
+playwright-report/
+test-results/
+src-tauri/target/
+src-tauri/gen/
+*.app/
+*.app
+*.dmg
+*.pkg
+*.zip
+*.local
+.env
+.env.*
+*.key
+*.pem
+.DS_Store
