@@ -5,6 +5,46 @@ export type OllamaGenerateResponse = {
   response?: string;
 };
 
+export const OLLAMA_REQUEST_TIMEOUT_MS = 30_000;
+
+async function fetchOllama(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs = OLLAMA_REQUEST_TIMEOUT_MS,
+) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Ollama antwoordde niet binnen 30 seconden");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+export function normalizeGeneratedValue(raw: string): string {
+  const withoutFence = raw
+    .trim()
+    .replace(/^```(?:text|plaintext)?\s*/i, "")
+    .replace(/\s*```$/i, "");
+  const firstLine =
+    withoutFence
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find(Boolean) ?? "";
+  return firstLine
+    .replace(
+      /^(?:here is (?:the )?value|hier is (?:de )?waarde|replacement|vervanging)\s*:\s*/i,
+      "",
+    )
+    .replace(/^['"`]+|['"`]+$/g, "")
+    .trim();
+}
+
 export type OllamaLocalModel = {
   name: string;
   size?: number;
@@ -105,7 +145,7 @@ export async function generateWithOllama(
     `Marker: ${marker}`,
   ].join("\n");
 
-  const response = await fetch(endpoint, {
+  const response = await fetchOllama(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model, prompt, stream: false }),
@@ -116,17 +156,17 @@ export async function generateWithOllama(
   }
 
   const payload = (await response.json()) as OllamaGenerateResponse;
-  const generated = payload.response?.trim();
+  const generated = payload.response ? normalizeGeneratedValue(payload.response) : "";
   if (!generated) {
     throw new Error("Ollama gaf geen vervangende waarde terug");
   }
-  return generated.replace(/^['"`]|['"`]$/g, "").trim();
+  return generated;
 }
 
 export async function listOllamaModels(
   endpoint = "http://localhost:11434/api/tags",
 ): Promise<OllamaLocalModel[]> {
-  const response = await fetch(endpoint);
+  const response = await fetchOllama(endpoint, {});
   if (!response.ok) {
     throw new Error(`Ollama antwoordde met HTTP ${response.status}`);
   }
@@ -155,7 +195,7 @@ export async function pullOllamaModel(
   onProgress?: (progress: OllamaPullProgress) => void,
   endpoint = "http://localhost:11434/api/pull",
 ): Promise<void> {
-  const response = await fetch(endpoint, {
+  const response = await fetchOllama(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model, stream: true }),
@@ -188,7 +228,7 @@ export async function chatWithOllama(
   onProgress?: (progress: OllamaChatProgress) => void,
   endpoint = "http://localhost:11434/api/chat",
 ): Promise<string> {
-  const response = await fetch(endpoint, {
+  const response = await fetchOllama(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

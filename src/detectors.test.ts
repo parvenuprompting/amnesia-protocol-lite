@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { detect, detectTerminal, isValidBsn, isValidIban, resolveOverlaps } from "./detectors";
+import {
+  detect,
+  detectTerminal,
+  isValidBsn,
+  isValidIban,
+  MAX_DETECTION_INPUT_LENGTH,
+  resolveOverlaps,
+} from "./detectors";
 import { mergeDetections } from "./review";
 
 describe("checksums", () => {
@@ -96,6 +103,19 @@ describe("detectors", () => {
     );
   });
 
+  it("supports common JSON and shell naming without flagging ordinary paths as secrets", () => {
+    const result = detectTerminal(
+      '{"customer": "12345678", "status": "ok"}\nklant_nr=87654321\n/var/log/app.log https://example.com/docs',
+    );
+    expect(result).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "customer", value: "12345678" }),
+        expect.objectContaining({ type: "customer", value: "87654321" }),
+      ]),
+    );
+    expect(result.some((item) => item.type === "secret" || item.type === "path")).toBe(false);
+  });
+
   it("handles long text while detecting a value near the end", () => {
     const text = `${"Geen gevoelige informatie. ".repeat(2000)} klant@example.com`;
     const start = performance.now();
@@ -106,6 +126,10 @@ describe("detectors", () => {
       true,
     );
     expect(duration).toBeLessThan(1000);
+  });
+
+  it("rejects input beyond the safety limit before running regexes", () => {
+    expect(() => detect("x".repeat(MAX_DETECTION_INPUT_LENGTH + 1))).toThrow("te groot");
   });
   it("detects all sensitive entities in Dutch customer service document", () => {
     const doc = [

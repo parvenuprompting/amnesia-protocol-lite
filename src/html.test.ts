@@ -19,6 +19,13 @@ describe("htmlToPlainText", () => {
     expect(result).toBe("Factuurdatum 15 maart 2026\n\nBedrag € 100,00");
   });
 
+  it("preserves table columns with tab separators", () => {
+    const result = htmlToPlainText(
+      "<table><tr><th>Naam</th><th>Bedrag</th></tr><tr><td>EMAIL_1</td><td>100</td></tr></table>",
+    );
+    expect(result).toBe("Naam\tBedrag\nEMAIL_1\t100");
+  });
+
   it("decodes HTML entities", () => {
     const result = htmlToPlainText("<p>Bedrag &euro; 100,00</p>");
     expect(result).toBe("Bedrag € 100,00");

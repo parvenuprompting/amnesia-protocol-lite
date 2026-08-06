@@ -3,6 +3,8 @@ import type { Detection, DetectionType } from "./types";
 type Candidate = Omit<Detection, "id" | "decision">;
 type ContextPattern = { type: DetectionType; regex: RegExp; confidence: number };
 
+export const MAX_DETECTION_INPUT_LENGTH = 1_000_000;
+
 const patterns: Array<{ type: DetectionType; regex: RegExp; confidence: number }> = [
   { type: "email", regex: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, confidence: 0.99 },
   {
@@ -78,6 +80,12 @@ const contextPatterns: ContextPattern[] = [
     regex:
       /\b(?:klantnummer|klantnr\.?|customer\s*(?:number|id)?|lid-?\/?relatienummer|lidnummer|lidnr\.?|relatienummer|relatienr\.?|accountnummer|accountnr\.?|polisnummer|polisnr\.?|gebruikersid|personeelsnummer|medewerkersnummer)\s*[:#-]?\s*(?<value>[A-Z0-9][A-Z0-9-]{3,})\b/gi,
     confidence: 0.98,
+  },
+  {
+    type: "customer",
+    regex:
+      /["']?(?:customer|customer[_ -]?number|klant[_ -]?nr\.?)["']?\s*[:=]\s*["']?(?<value>[A-Z0-9][A-Z0-9-]{3,})["']?/gi,
+    confidence: 0.96,
   },
   {
     type: "transaction",
@@ -301,6 +309,11 @@ function collectPatternCandidates(
 }
 
 export function detect(text: string): Detection[] {
+  if (text.length > MAX_DETECTION_INPUT_LENGTH) {
+    throw new Error(
+      `Tekst is te groot om veilig te analyseren. Maximum is ${MAX_DETECTION_INPUT_LENGTH.toLocaleString("nl-NL")} tekens.`,
+    );
+  }
   const candidates = [...collectContextCandidates(text), ...collectPatternCandidates(text)];
   return resolveOverlaps(candidates).map((candidate, index) => ({
     ...candidate,
