@@ -16,8 +16,9 @@ export function HomeScreen({ onStart, onStartChat }: HomeScreenProps) {
           <em>klaar om te delen.</em>
         </h1>
         <p className="home-description">
-          Amnesia Protocol helpt je gevoelige klantgegevens te vinden en te vervangen voordat je
-          tekst een ander venster of een externe dienst bereikt. Alles blijft lokaal en de
+          Amnesia Protocol helpt je gevoelige gegevens te vinden en te vervangen voordat je tekst
+          een ander venster of een externe dienst bereikt. Beoordeel elke markering, maak daarna
+          realistische fictieve data en stel vragen aan de lokale chat. Alles blijft lokaal en de
           pseudoniem-mapping bestaat alleen zolang deze sessie open is.
         </p>
         <div className="home-actions">
