@@ -396,6 +396,12 @@ button:disabled {
 .mark-ip {
   background: #d6e3ea;
 }
+.mark-amount {
+  background: #eaded0;
+}
+.mark-number {
+  background: #e4ded7;
+}
 .mark.rejected {
   background: transparent;
   text-decoration: line-through;
@@ -500,6 +506,12 @@ button:disabled {
 .type-iban,
 .type-bsn {
   background: #967995;
+}
+.type-amount {
+  background: #b59570;
+}
+.type-number {
+  background: #9c8e7f;
 }
 .candidate-type {
   color: #817c73;
@@ -711,6 +723,78 @@ footer span {
   gap: 5px;
   align-items: center;
 }
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(37, 37, 34, 0.45);
+  padding: 22px;
+}
+
+.modal {
+  width: min(420px, 100%);
+  background: #f9f8f4;
+  border: 1px solid #dcd8ce;
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(37, 37, 34, 0.18);
+  padding: 22px 24px 24px;
+}
+
+.modal-head {
+  font:
+    17px Georgia,
+    serif;
+  color: #252522;
+  margin-bottom: 10px;
+}
+
+.modal-message {
+  color: #6b675e;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 18px;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 18px;
+  border: 1px solid #d4d0c6;
+  border-radius: 8px;
+  background: #fff;
+  color: #252522;
+  font:
+    13px ui-monospace,
+    monospace;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-actions button {
+  padding: 8px 13px;
+  border-radius: 7px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.modal-cancel {
+  border: 1px solid #d4d0c6;
+  background: transparent;
+  color: #7a756d;
+}
+
+.modal-confirm {
+  border: 0;
+  background: #252522;
+  color: #f4f1ea;
+}
+
 @media (max-width: 1050px) {
   .app-shell {
     padding: 0 22px 18px;

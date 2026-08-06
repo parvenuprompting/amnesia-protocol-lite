@@ -26,6 +26,17 @@ type ClipboardStatus =
   | { state: "success"; message: string }
   | { state: "error"; message: string };
 
+type DialogState =
+  | {
+      open: true;
+      title: string;
+      message: string;
+      input?: string;
+      onConfirm: (value?: string) => void;
+      onCancel: () => void;
+    }
+  | { open: false };
+
 function tokenFor(type: DetectionType, index: number) {
   return `${type.toUpperCase()}_${index}`;
 }
@@ -78,6 +89,7 @@ function App() {
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [toastKey, setToastKey] = useState(0);
   const [clipboardStatus, setClipboardStatus] = useState<ClipboardStatus>({ state: "idle" });
+  const [dialog, setDialog] = useState<DialogState>({ open: false });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const showToast = (msg: string) => {
@@ -91,6 +103,43 @@ function App() {
     const timeout = window.setTimeout(() => setFeedbackVisible(false), 2400);
     return () => window.clearTimeout(timeout);
   }, [feedbackVisible, toastKey]);
+
+  const askConfirm = (messageText: string, title = "Bevestigen") => {
+    return new Promise<boolean>((resolve) => {
+      setDialog({
+        open: true,
+        title,
+        message: messageText,
+        onConfirm: () => {
+          setDialog({ open: false });
+          resolve(true);
+        },
+        onCancel: () => {
+          setDialog({ open: false });
+          resolve(false);
+        },
+      });
+    });
+  };
+
+  const askPrompt = (messageText: string, defaultValue = "") => {
+    return new Promise<string | null>((resolve) => {
+      setDialog({
+        open: true,
+        title: "Waarde aanpassen",
+        message: messageText,
+        input: defaultValue,
+        onConfirm: (value) => {
+          setDialog({ open: false });
+          resolve(value ?? null);
+        },
+        onCancel: () => {
+          setDialog({ open: false });
+          resolve(null);
+        },
+      });
+    });
+  };
 
   const update = (action: ReviewAction) => {
     setHistory((items) => [...items, detections]);
@@ -164,9 +213,10 @@ function App() {
   const copyOutput = async () => {
     if (
       pending > 0 &&
-      !window.confirm(
+      !(await askConfirm(
         `${pending} kandidaat${pending === 1 ? " is" : "en zijn"} nog niet beoordeeld. Toch kopiëren?`,
-      )
+        "Onbeoordeelde kandidaten",
+      ))
     )
       return;
     setClipboardStatus({ state: "copying" });
@@ -186,16 +236,17 @@ function App() {
     }
   };
 
-  const replaceAll = () => {
+  const replaceAll = async () => {
     if (!detections.length) {
       setClipboardStatus({ state: "error", message: "Geen kandidaten om te vervangen" });
       showToast("Geen kandidaten om te vervangen");
       return;
     }
     if (
-      !window.confirm(
+      !(await askConfirm(
         `Dit vervangt alle ${detections.length} geflagde items. Je kunt daarna zelf de tekst kopiëren. Doorgaan?`,
-      )
+        "Alles vervangen",
+      ))
     )
       return;
     const allAccepted = detections.map((item) => ({ ...item, decision: "accepted" as const }));
@@ -289,7 +340,7 @@ function App() {
               <div className="panel-head">
                 <div>
                   <span className="panel-kicker">BRONTEKST</span>
-                  <span className="panel-title">Te beoordelen inhoud</span>
+                  <span className="panel-title">Te beoordeelen inhoud</span>
                 </div>
                 <span className="char-count">{text.length} tekens</span>
               </div>
@@ -383,71 +434,35 @@ function App() {
                       <button
                         type="button"
                         onClick={() => {
-                          const nextDecision =
-                            item.decision === "accepted" ? "pending" : "accepted";
-                          update({ id: item.id, decision: nextDecision });
-                          showToast(
-                            nextDecision === "accepted"
-                              ? "Generieke vervanger aangemaakt"
-                              : "Markering hersteld naar open",
-                          );
+                          update({ id: item.id, decision: "accepted" });
+                          showToast("Generieke vervanger aangemaakt");
                         }}
-                        className={`generate ${item.decision === "accepted" ? "active" : ""}`}
+                        className="generate"
                         data-testid={`generate-${item.id}`}
-                        aria-label="Genereer token"
-                        title={
-                          item.decision === "accepted"
-                            ? "Token geactiveerd (klik om te herstellen)"
-                            : "Genereer een generieke vervanger"
-                        }
                       >
-                        {item.decision === "accepted" ? (
-                          <Check size={14} />
-                        ) : (
-                          <Sparkles size={14} />
-                        )}
-                        {item.decision === "accepted" ? "Token actief" : "Genereer token"}
+                        <Sparkles size={14} /> Genereer token
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          const nextDecision =
-                            item.decision === "rejected" ? "pending" : "rejected";
-                          update({ id: item.id, decision: nextDecision });
-                          showToast(
-                            nextDecision === "rejected"
-                              ? "Kandidaat genegeerd"
-                              : "Markering hersteld naar open",
-                          );
-                        }}
-                        className={`reject ${item.decision === "rejected" ? "active" : ""}`}
-                        aria-label="Negeren"
-                        title={
-                          item.decision === "rejected"
-                            ? "Kandidaat is genegeerd (klik om te herstellen)"
-                            : "Laat deze kandidaat ongewijzigd"
-                        }
+                        onClick={() => update({ id: item.id, decision: "rejected" })}
+                        className="reject"
+                        title="Laat deze kandidaat ongewijzigd"
                       >
-                        <X size={14} /> {item.decision === "rejected" ? "Genegeerd" : "Negeren"}
+                        <X size={14} /> Negeren
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          const promptResult = window.prompt("Pas de waarde aan", item.value);
-                          if (promptResult !== null) {
-                            const trimmed = promptResult.trim();
-                            if (trimmed) {
-                              update({
-                                id: item.id,
-                                decision: "edited",
-                                value: trimmed,
-                              });
-                              showToast("Waarde aangepast");
-                            }
+                        onClick={async () => {
+                          const next = await askPrompt("Pas de waarde aan", item.value);
+                          if (next === null) return;
+                          const trimmed = next.trim();
+                          if (!trimmed) {
+                            showToast("Waarde mag niet leeg zijn");
+                            return;
                           }
+                          update({ id: item.id, decision: "edited", value: trimmed });
                         }}
-                        className={`edit ${item.decision === "edited" ? "active" : ""}`}
-                        aria-label="Waarde aanpassen"
+                        className="edit"
                         title="Pas de gemarkeerde waarde aan"
                       >
                         Waarde aanpassen
@@ -525,6 +540,56 @@ function App() {
         <div className="feedback-toast" role="status">
           <Check size={16} />
           <span>{message}</span>
+        </div>
+      )}
+      {dialog.open && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" data-testid="modal">
+          <div className="modal">
+            <div className="modal-head">
+              <strong>{dialog.title}</strong>
+            </div>
+            <p className="modal-message">{dialog.message}</p>
+            {dialog.input !== undefined && (
+              <input
+                type="text"
+                className="modal-input"
+                defaultValue={dialog.input}
+                data-testid="modal-input"
+                autoFocus
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") dialog.onConfirm(event.currentTarget.value);
+                  if (event.key === "Escape") dialog.onCancel();
+                }}
+              />
+            )}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="modal-cancel"
+                data-testid="modal-cancel"
+                onClick={dialog.onCancel}
+              >
+                Annuleren
+              </button>
+              <button
+                type="button"
+                className="modal-confirm"
+                data-testid="modal-ok"
+                onClick={() => {
+                  if (dialog.input !== undefined) {
+                    const input = document.querySelector(
+                      '[data-testid="modal-input"]',
+                    ) as HTMLInputElement | null;
+                    dialog.onConfirm(input?.value ?? "");
+                  } else {
+                    dialog.onConfirm();
+                  }
+                }}
+              >
+                Doorgaan
+              </button>
+            </div>
+          </div>
         </div>
       )}
       <footer>
