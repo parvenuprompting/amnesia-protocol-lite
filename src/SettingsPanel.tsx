@@ -102,6 +102,25 @@ export function SettingsPanel({
               <RefreshCw size={15} />
             </button>
           </div>
+          {(ollamaStatus === "error" || (ollamaStatus === "ready" && localModels.length === 0)) && (
+            <div className="ollama-onboarding">
+              <strong>
+                Ollama {ollamaStatus === "error" ? "niet gevonden" : "heeft nog geen modellen"}
+              </strong>
+              <p>
+                Review, Terminal en standaard synthetische vervanging werken zonder Ollama. Voor
+                lokale chat en AI-vervanging van `OTHER` heb je Ollama nodig.
+              </p>
+              <a href="https://ollama.com/download/mac" target="_blank" rel="noreferrer">
+                Open Ollama downloadpagina
+              </a>
+              <ol>
+                <li>Installeer Ollama voor macOS.</li>
+                <li>Open Ollama en kom daarna hier terug.</li>
+                <li>Klik op Ververs lokale modellen.</li>
+              </ol>
+            </div>
+          )}
           <div className="settings-download-box">
             <label>
               <span>Nieuw model downloaden</span>

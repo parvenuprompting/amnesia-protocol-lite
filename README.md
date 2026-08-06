@@ -182,6 +182,17 @@ Vereisten:
 - Rust en Cargo
 - Ollama is alleen nodig voor AI-vervanging van `OTHER`
 
+## Ollama installeren
+
+Ollama wordt niet meegeleverd met de macOS-app. Zonder Ollama blijven Review, Terminal en standaard synthetische vervanging gewoon werken. Alleen lokale chat en AI-vervanging van `OTHER` hebben Ollama nodig.
+
+1. Installeer Ollama voor macOS via [ollama.com/download/mac](https://ollama.com/download/mac).
+2. Open Ollama één keer zodat de lokale server draait.
+3. Open in Amnesia Protocol `Instellingen` en klik op `Ververs lokale modellen`.
+4. Installeer eventueel Mistral of de lichte Gemma 3 1B-fallback vanuit hetzelfde instellingenpaneel.
+
+De app communiceert alleen met Ollama op `http://localhost:11434`. Modeldownloads zijn de enige optionele actie die een internetverbinding gebruikt. Als Ollama niet aanwezig is, toont Instellingen een korte onboarding met deze stappen.
+
 Installeer dependencies:
 
 ```bash
