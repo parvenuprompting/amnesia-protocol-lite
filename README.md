@@ -19,9 +19,13 @@ De app is ontworpen voor persoonlijk gebruik op één Mac. Het doel is gecontrol
 
 ![Amnesia Protocol Welkomstscherm](docs/images/home-screen.png)
 
-### Review Workspace
+### 01 Review Workspace
 
 ![Amnesia Protocol Review Workspace](docs/images/review-screen.png)
+
+### 02 Synthetische Vervangers
+
+![Amnesia Protocol Synthetische Vervangers](docs/images/synthetic-screen.png)
 
 ## Kernprincipes
 
