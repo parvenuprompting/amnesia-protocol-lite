@@ -41,36 +41,32 @@ export type OllamaCatalogModel = {
   description: string;
 };
 
+export const PRIMARY_OLLAMA_MODEL = "mistral:latest";
+export const FALLBACK_OLLAMA_MODEL = "gemma3:1b";
+
 export const OLLAMA_CATALOG: OllamaCatalogModel[] = [
   {
-    name: "llama3.2",
-    label: "Llama 3.2",
-    downloadSize: "~2 GB",
-    recommendedRam: "8 GB RAM",
-    description: "Klein en geschikt als standaardmodel voor korte vervangingen.",
-  },
-  {
-    name: "qwen2.5:7b",
-    label: "Qwen 2.5 7B",
-    downloadSize: "~4.7 GB",
-    recommendedRam: "16 GB RAM",
-    description: "Sterk meertalig model, maar merkbaar zwaarder.",
-  },
-  {
-    name: "mistral:7b",
-    label: "Mistral 7B",
+    name: PRIMARY_OLLAMA_MODEL,
+    label: "Mistral",
     downloadSize: "~4.1 GB",
     recommendedRam: "16 GB RAM",
-    description: "Goede algemene kwaliteit met hogere geheugendruk.",
+    description: "Primair model voor chat en OTHER-vervangingen.",
   },
   {
-    name: "llama3.1:8b",
-    label: "Llama 3.1 8B",
-    downloadSize: "~4.9 GB",
-    recommendedRam: "16 GB RAM",
-    description: "Groter model voor rijkere context, niet ideaal voor oudere Macs.",
+    name: FALLBACK_OLLAMA_MODEL,
+    label: "Gemma 3 1B",
+    downloadSize: "~0.8 GB",
+    recommendedRam: "4 GB RAM",
+    description: "Lichte fallback voor kleinere Macs of wanneer Mistral ontbreekt.",
   },
 ];
+
+export function resolveOllamaModel(models: OllamaLocalModel[]) {
+  const primary = models.find((model) => model.name === PRIMARY_OLLAMA_MODEL);
+  if (primary) return { ...primary, fallback: false };
+  const fallback = models.find((model) => model.name === FALLBACK_OLLAMA_MODEL);
+  return fallback ? { ...fallback, fallback: true } : null;
+}
 
 export async function generateWithOllama(
   marker: string,

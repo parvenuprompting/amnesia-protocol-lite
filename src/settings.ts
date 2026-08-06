@@ -3,13 +3,11 @@ import type { ClipboardClearDelay } from "./clipboard";
 import type { SyntheticLocale } from "./synthetic";
 
 export type AppSettings = {
-  preferredModel: string;
   syntheticLocale: SyntheticLocale;
   clipboardClearAfter: ClipboardClearDelay;
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  preferredModel: "llama3.2",
   syntheticLocale: "nl",
   clipboardClearAfter: 60_000,
 };
@@ -25,19 +23,13 @@ export function loadSettings(
       storage.getItem(SETTINGS_KEY) ?? "null",
     ) as Partial<AppSettings> | null;
     return {
-      ...DEFAULT_SETTINGS,
-      ...parsed,
+      syntheticLocale: parsed?.syntheticLocale === "en" ? "en" : DEFAULT_SETTINGS.syntheticLocale,
       clipboardClearAfter: [0, 30_000, 60_000, 300_000].includes(
         parsed?.clipboardClearAfter ?? DEFAULT_SETTINGS.clipboardClearAfter,
       )
         ? ((parsed?.clipboardClearAfter ??
             DEFAULT_SETTINGS.clipboardClearAfter) as ClipboardClearDelay)
         : DEFAULT_SETTINGS.clipboardClearAfter,
-      syntheticLocale: parsed?.syntheticLocale === "en" ? "en" : "nl",
-      preferredModel:
-        typeof parsed?.preferredModel === "string" && parsed.preferredModel.trim()
-          ? parsed.preferredModel
-          : DEFAULT_SETTINGS.preferredModel,
     };
   } catch {
     return DEFAULT_SETTINGS;
