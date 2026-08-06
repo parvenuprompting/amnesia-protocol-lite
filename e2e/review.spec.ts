@@ -24,8 +24,9 @@ test("plakken, reviewen, handmatig markeren en undo", async ({ page }) => {
   await editor.fill("Mail klant@example.com voor klantnummer 123456 aangepast.");
   await expect(candidates.nth(0)).toHaveClass(/accepted/);
   await expect(candidates.nth(1)).toHaveClass(/rejected/);
-  page.once("dialog", (dialog) => dialog.accept("dossier 123456"));
   await candidates.nth(1).getByRole("button", { name: "Waarde aanpassen" }).click();
+  await page.getByTestId("modal-input").fill("dossier 123456");
+  await page.getByTestId("modal-ok").click();
   await editor.evaluate((element) => {
     const input = element as HTMLTextAreaElement;
     input.setSelectionRange(5, 20);
@@ -34,8 +35,8 @@ test("plakken, reviewen, handmatig markeren en undo", async ({ page }) => {
   await expect(page.getByRole("status")).toHaveText("Handmatige markering toegevoegd");
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByRole("status")).toHaveText("Actie ongedaan gemaakt");
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByTestId("replace-all").click();
+  await page.getByTestId("modal-ok").click();
   await expect(page.getByRole("status")).toHaveText(/items vervangen\. Controleer de tekst/);
   await expect(page.evaluate(() => navigator.clipboard.readText())).resolves.not.toContain(
     "CUSTOMER_1",

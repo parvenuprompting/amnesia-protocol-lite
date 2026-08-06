@@ -14,9 +14,11 @@ De app is bedoeld voor persoonlijk gebruik op één Mac. Het doel is gecontrolee
 ## Screenshots
 
 ### Welkomstscherm
+
 ![Amnesia Protocol Welkomstscherm](docs/images/home-screen.png)
 
 ### Review Workspace
+
 ![Amnesia Protocol Review Workspace](docs/images/review-screen.png)
 
 ## Kernprincipes
