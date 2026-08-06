@@ -13,7 +13,11 @@ import {
 } from "lucide-react";
 import { copyAndVerify } from "./clipboard";
 import { detect } from "./detectors";
+import { htmlToPlainText, insertTextAtSelection } from "./html";
+import { generateWithOllama } from "./ollama";
 import { applyAction, mergeDetections, replaceAccepted, type ReviewAction } from "./review";
+import { SyntheticPanel, type SyntheticEntry } from "./SyntheticPanel";
+import { createSyntheticMap } from "./synthetic";
 import type { Detection, DetectionType } from "./types";
 import { TYPE_LABELS } from "./types";
 
@@ -78,7 +82,7 @@ function MarkerText({ text, detections }: { text: string; detections: Detection[
 }
 
 function App() {
-  const [screen, setScreen] = useState<"home" | "review">("home");
+  const [screen, setScreen] = useState<"home" | "review" | "synthetic">("home");
   const [text, setText] = useState(initialText);
   const [detections, setDetections] = useState<Detection[]>(() => detect(initialText));
   const [history, setHistory] = useState<Detection[][]>([]);
@@ -90,6 +94,12 @@ function App() {
   const [toastKey, setToastKey] = useState(0);
   const [clipboardStatus, setClipboardStatus] = useState<ClipboardStatus>({ state: "idle" });
   const [dialog, setDialog] = useState<DialogState>({ open: false });
+  const [syntheticValues, setSyntheticValues] = useState<Map<string, string>>(new Map());
+  const [ollamaModel, setOllamaModel] = useState("llama3.2");
+  const [otherFormatHint, setOtherFormatHint] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [sessionSeed] = useState(() => Date.now());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const showToast = (msg: string) => {
@@ -154,6 +164,18 @@ function App() {
     showToast("Nieuwe tekst gedetecteerd");
   };
 
+  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    event.preventDefault();
+    const input = event.currentTarget;
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? 0;
+    const html = event.clipboardData.getData("text/html");
+    const plain = event.clipboardData.getData("text/plain");
+    const pasted = html ? htmlToPlainText(html) : plain;
+    if (!pasted) return;
+    onTextChange(insertTextAtSelection(text, pasted, start, end));
+  };
+
   const addManual = () => {
     const editor = textareaRef.current;
     if (!editor || editor.selectionStart === editor.selectionEnd) {
@@ -210,6 +232,55 @@ function App() {
   );
   const output = replaceAccepted(text, detections, tokens);
 
+  const syntheticEntries = useMemo<SyntheticEntry[]>(() => {
+    const seen = new Set<string>();
+    return detections
+      .filter((item) => item.decision === "accepted" || item.decision === "edited")
+      .filter((item) => {
+        if (seen.has(item.value)) return false;
+        seen.add(item.value);
+        return true;
+      })
+      .map((item) => ({
+        key: `${item.type}:${item.value}`,
+        token: tokens.get(item.value) ?? tokenFor(item.type, 1),
+        type: item.type,
+        value: item.value,
+        replacement: syntheticValues.get(item.value) ?? "",
+      }));
+  }, [detections, syntheticValues, tokens]);
+
+  const syntheticReplacementMap = useMemo(() => {
+    const replacements = new Map(syntheticValues);
+    detections
+      .filter((item) => item.decision === "accepted" || item.decision === "edited")
+      .forEach((item) => {
+        if (!replacements.has(item.value)) {
+          replacements.set(item.value, tokens.get(item.value) ?? `[${tokenFor(item.type, 1)}]`);
+        }
+      });
+    return replacements;
+  }, [detections, syntheticValues, tokens]);
+
+  const syntheticOutput = replaceAccepted(text, detections, syntheticReplacementMap);
+
+  useEffect(() => {
+    if (screen !== "synthetic") return;
+    const generated = createSyntheticMap(
+      detections
+        .filter((item) => item.decision === "accepted" || item.decision === "edited")
+        .map((item) => ({ type: item.type, value: item.value })),
+      sessionSeed,
+    );
+    setSyntheticValues((current) => {
+      const next = new Map(current);
+      generated.forEach((value, key) => {
+        if (!next.has(key)) next.set(key, value);
+      });
+      return next;
+    });
+  }, [detections, screen, sessionSeed]);
+
   const copyOutput = async () => {
     if (
       pending > 0 &&
@@ -256,6 +327,63 @@ function App() {
     const successMessage = `${detections.length} items vervangen. Controleer de tekst en klik daarna op Kopieer veilige tekst.`;
     setClipboardStatus({ state: "success", message: successMessage });
     showToast(successMessage);
+  };
+
+  const generateStandardReplacements = () => {
+    const generated = createSyntheticMap(
+      detections
+        .filter((item) => item.decision === "accepted" || item.decision === "edited")
+        .map((item) => ({ type: item.type, value: item.value })),
+      sessionSeed,
+    );
+    setSyntheticValues((current) => new Map([...current, ...generated]));
+    showToast("Standaardvervangers gegenereerd");
+  };
+
+  const generateOther = async (entry: SyntheticEntry) => {
+    if (!ollamaModel.trim()) {
+      setAiError("Vul eerst de naam van een lokaal Ollama-model in.");
+      return;
+    }
+    setAiBusy(true);
+    setAiError("");
+    try {
+      const replacement = await generateWithOllama(
+        entry.value,
+        otherFormatHint,
+        ollamaModel.trim(),
+      );
+      setSyntheticValues((current) => new Map(current).set(entry.value, replacement));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Onbekende Ollama-fout";
+      setAiError(`${message}. Controleer of Ollama draait en het model lokaal beschikbaar is.`);
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const updateSyntheticReplacement = (entry: SyntheticEntry, value: string) => {
+    setSyntheticValues((current) => new Map(current).set(entry.value, value));
+  };
+
+  const copySynthetic = async () => {
+    const missing = syntheticEntries.filter((entry) => !entry.replacement.trim());
+    if (missing.length) {
+      showToast("Genereer eerst alle vervangers voordat je kopieert");
+      return;
+    }
+    setClipboardStatus({ state: "copying" });
+    try {
+      await copyAndVerify(syntheticOutput);
+      const successMessage = `${syntheticEntries.length} synthetische vervangers gekopieerd`;
+      setClipboardStatus({ state: "success", message: successMessage });
+      showToast(successMessage);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "onbekende clipboardfout";
+      setClipboardStatus({ state: "error", message: "Kopiëren mislukt" });
+      console.error("Synthetic clipboard copy failed:", errorMessage);
+      showToast("Kopiëren is niet gelukt");
+    }
   };
 
   return (
@@ -335,205 +463,246 @@ function App() {
         </section>
       ) : (
         <>
-          <section className="workspace">
-            <div className="editor-panel panel">
-              <div className="panel-head">
-                <div>
-                  <span className="panel-kicker">BRONTEKST</span>
-                  <span className="panel-title">Te beoordeelen inhoud</span>
+          <nav className="workspace-tabs" aria-label="Werklaag">
+            <button
+              type="button"
+              className={screen === "review" ? "active" : ""}
+              onClick={() => setScreen("review")}
+            >
+              01 Review
+            </button>
+            <button
+              type="button"
+              className={screen === "synthetic" ? "active" : ""}
+              onClick={() => setScreen("synthetic")}
+              disabled={
+                !detections.some(
+                  (item) => item.decision === "accepted" || item.decision === "edited",
+                )
+              }
+            >
+              02 Synthetisch
+            </button>
+          </nav>
+          {screen === "review" ? (
+            <>
+              <section className="workspace">
+                <div className="editor-panel panel">
+                  <div className="panel-head">
+                    <div>
+                      <span className="panel-kicker">BRONTEKST</span>
+                      <span className="panel-title">Te beoordeelen inhoud</span>
+                    </div>
+                    <span className="char-count">{text.length} tekens</span>
+                  </div>
+                  <div className="editor-wrap">
+                    <div className="highlight-layer" aria-hidden="true">
+                      <MarkerText text={text} detections={detections} />
+                    </div>
+                    <textarea
+                      ref={textareaRef}
+                      aria-label="Brontekst"
+                      value={text}
+                      onChange={(event) => onTextChange(event.target.value)}
+                      onPaste={handlePaste}
+                      onScroll={(event) => {
+                        const layer = event.currentTarget.previousElementSibling as HTMLElement;
+                        layer.scrollTop = event.currentTarget.scrollTop;
+                        layer.scrollLeft = event.currentTarget.scrollLeft;
+                      }}
+                      spellCheck={false}
+                    />
+                  </div>
+                  <div className="editor-foot">
+                    <span>
+                      <Sparkles size={14} /> Tip: selecteer tekst om handmatig te markeren
+                    </span>
+                    <button
+                      type="button"
+                      className="add-mark"
+                      onClick={addManual}
+                      aria-label="Markering toevoegen"
+                      title="Markering toevoegen"
+                    >
+                      <Plus size={17} />
+                    </button>
+                  </div>
                 </div>
-                <span className="char-count">{text.length} tekens</span>
-              </div>
-              <div className="editor-wrap">
-                <div className="highlight-layer" aria-hidden="true">
-                  <MarkerText text={text} detections={detections} />
+                <aside className="review-panel panel">
+                  <div className="panel-head">
+                    <div>
+                      <span className="panel-kicker">REVIEW</span>
+                      <span className="panel-title">
+                        Kandidaten <b>{detections.length}</b>
+                      </span>
+                    </div>
+                    <span className={`review-status ${pending ? "attention" : "ready"}`}>
+                      {pending ? `${pending} open` : "gereviewd"}
+                    </span>
+                  </div>
+                  <div className="filter-row">
+                    <button
+                      className={filter === "all" ? "active" : ""}
+                      onClick={() => setFilter("all")}
+                    >
+                      Alle
+                    </button>
+                    <button
+                      className={filter === "pending" ? "active" : ""}
+                      onClick={() => setFilter("pending")}
+                    >
+                      Open
+                    </button>
+                    <button
+                      className={filter === "accepted" ? "active" : ""}
+                      onClick={() => setFilter("accepted")}
+                    >
+                      Akkoord
+                    </button>
+                    <button
+                      className={filter === "rejected" ? "active" : ""}
+                      onClick={() => setFilter("rejected")}
+                    >
+                      Genegeerd
+                    </button>
+                  </div>
+                  <div className="candidate-list">
+                    {filtered.map((item) => (
+                      <article className={`candidate ${item.decision}`} key={item.id}>
+                        <div className="candidate-top">
+                          <span className={`type-dot type-${item.type}`} />
+                          <span className="candidate-type">{TYPE_LABELS[item.type]}</span>
+                          <span className="confidence">{Math.round(item.confidence * 100)}%</span>
+                        </div>
+                        <div className="candidate-value">{item.value}</div>
+                        {(item.decision === "accepted" || item.decision === "edited") &&
+                          tokens.has(item.value) && (
+                            <div className="candidate-token" data-testid={`token-${item.id}`}>
+                              <span>VERVANGER</span>
+                              <code>{tokens.get(item.value)}</code>
+                            </div>
+                          )}
+                        <div className="candidate-actions">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              update({ id: item.id, decision: "accepted" });
+                              showToast("Generieke vervanger aangemaakt");
+                            }}
+                            className="generate"
+                            data-testid={`generate-${item.id}`}
+                          >
+                            <Sparkles size={14} /> Genereer token
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => update({ id: item.id, decision: "rejected" })}
+                            className="reject"
+                            title="Laat deze kandidaat ongewijzigd"
+                          >
+                            <X size={14} /> Negeren
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const next = await askPrompt("Pas de waarde aan", item.value);
+                              if (next === null) return;
+                              const trimmed = next.trim();
+                              if (!trimmed) {
+                                showToast("Waarde mag niet leeg zijn");
+                                return;
+                              }
+                              update({ id: item.id, decision: "edited", value: trimmed });
+                            }}
+                            className="edit"
+                            title="Pas de gemarkeerde waarde aan"
+                          >
+                            Waarde aanpassen
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                    {!filtered.length && (
+                      <div className="empty">
+                        <Check size={22} />
+                        <p>Geen kandidaten in deze weergave.</p>
+                      </div>
+                    )}
+                  </div>
+                </aside>
+              </section>
+              <section className="bottom-bar">
+                <div className="manual-control">
+                  <span>Handmatig label</span>
+                  <select
+                    aria-label="Type handmatig label"
+                    value={selectedType}
+                    onChange={(event) => setSelectedType(event.target.value as DetectionType)}
+                  >
+                    {typeOptions.map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <textarea
-                  ref={textareaRef}
-                  aria-label="Brontekst"
-                  value={text}
-                  onChange={(event) => onTextChange(event.target.value)}
-                  onScroll={(event) => {
-                    const layer = event.currentTarget.previousElementSibling as HTMLElement;
-                    layer.scrollTop = event.currentTarget.scrollTop;
-                    layer.scrollLeft = event.currentTarget.scrollLeft;
-                  }}
-                  spellCheck={false}
-                />
-              </div>
-              <div className="editor-foot">
-                <span>
-                  <Sparkles size={14} /> Tip: selecteer tekst om handmatig te markeren
-                </span>
-                <button
-                  type="button"
-                  className="add-mark"
-                  onClick={addManual}
-                  aria-label="Markering toevoegen"
-                  title="Markering toevoegen"
-                >
-                  <Plus size={17} />
-                </button>
-              </div>
-            </div>
-            <aside className="review-panel panel">
-              <div className="panel-head">
-                <div>
-                  <span className="panel-kicker">REVIEW</span>
-                  <span className="panel-title">
-                    Kandidaten <b>{detections.length}</b>
+                <div className="copy-preview">
+                  <span className="output-label">OUTPUT</span>
+                  <span>
+                    {
+                      detections.filter(
+                        (item) => item.decision === "accepted" || item.decision === "edited",
+                      ).length
+                    }{" "}
+                    vervangingen voorbereid
                   </span>
                 </div>
-                <span className={`review-status ${pending ? "attention" : "ready"}`}>
-                  {pending ? `${pending} open` : "gereviewd"}
-                </span>
-              </div>
-              <div className="filter-row">
-                <button
-                  className={filter === "all" ? "active" : ""}
-                  onClick={() => setFilter("all")}
+                <div
+                  className={`clipboard-status ${clipboardStatus.state}`}
+                  aria-live="polite"
+                  data-testid="clipboard-status"
                 >
-                  Alle
+                  {clipboardStatus.state === "copying" && "Kopiëren..."}
+                  {clipboardStatus.state === "success" && clipboardStatus.message}
+                  {clipboardStatus.state === "error" && clipboardStatus.message}
+                </div>
+                <button
+                  className="bulk-copy-button"
+                  type="button"
+                  onClick={replaceAll}
+                  disabled={clipboardStatus.state === "copying"}
+                  data-testid="replace-all"
+                  title="Vervang alle geflagde items zonder ze te kopiëren"
+                >
+                  <Sparkles size={16} /> Alles vervangen
                 </button>
                 <button
-                  className={filter === "pending" ? "active" : ""}
-                  onClick={() => setFilter("pending")}
+                  className="copy-button"
+                  type="button"
+                  onClick={copyOutput}
+                  disabled={clipboardStatus.state === "copying"}
                 >
-                  Open
+                  <Clipboard size={17} />{" "}
+                  {clipboardStatus.state === "copying" ? "Kopiëren..." : "Kopieer veilige tekst"}
                 </button>
-                <button
-                  className={filter === "accepted" ? "active" : ""}
-                  onClick={() => setFilter("accepted")}
-                >
-                  Akkoord
-                </button>
-                <button
-                  className={filter === "rejected" ? "active" : ""}
-                  onClick={() => setFilter("rejected")}
-                >
-                  Genegeerd
-                </button>
-              </div>
-              <div className="candidate-list">
-                {filtered.map((item) => (
-                  <article className={`candidate ${item.decision}`} key={item.id}>
-                    <div className="candidate-top">
-                      <span className={`type-dot type-${item.type}`} />
-                      <span className="candidate-type">{TYPE_LABELS[item.type]}</span>
-                      <span className="confidence">{Math.round(item.confidence * 100)}%</span>
-                    </div>
-                    <div className="candidate-value">{item.value}</div>
-                    {(item.decision === "accepted" || item.decision === "edited") &&
-                      tokens.has(item.value) && (
-                        <div className="candidate-token" data-testid={`token-${item.id}`}>
-                          <span>VERVANGER</span>
-                          <code>{tokens.get(item.value)}</code>
-                        </div>
-                      )}
-                    <div className="candidate-actions">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          update({ id: item.id, decision: "accepted" });
-                          showToast("Generieke vervanger aangemaakt");
-                        }}
-                        className="generate"
-                        data-testid={`generate-${item.id}`}
-                      >
-                        <Sparkles size={14} /> Genereer token
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => update({ id: item.id, decision: "rejected" })}
-                        className="reject"
-                        title="Laat deze kandidaat ongewijzigd"
-                      >
-                        <X size={14} /> Negeren
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const next = await askPrompt("Pas de waarde aan", item.value);
-                          if (next === null) return;
-                          const trimmed = next.trim();
-                          if (!trimmed) {
-                            showToast("Waarde mag niet leeg zijn");
-                            return;
-                          }
-                          update({ id: item.id, decision: "edited", value: trimmed });
-                        }}
-                        className="edit"
-                        title="Pas de gemarkeerde waarde aan"
-                      >
-                        Waarde aanpassen
-                      </button>
-                    </div>
-                  </article>
-                ))}
-                {!filtered.length && (
-                  <div className="empty">
-                    <Check size={22} />
-                    <p>Geen kandidaten in deze weergave.</p>
-                  </div>
-                )}
-              </div>
-            </aside>
-          </section>
-          <section className="bottom-bar">
-            <div className="manual-control">
-              <span>Handmatig label</span>
-              <select
-                aria-label="Type handmatig label"
-                value={selectedType}
-                onChange={(event) => setSelectedType(event.target.value as DetectionType)}
-              >
-                {typeOptions.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="copy-preview">
-              <span className="output-label">OUTPUT</span>
-              <span>
-                {
-                  detections.filter(
-                    (item) => item.decision === "accepted" || item.decision === "edited",
-                  ).length
-                }{" "}
-                vervangingen voorbereid
-              </span>
-            </div>
-            <div
-              className={`clipboard-status ${clipboardStatus.state}`}
-              aria-live="polite"
-              data-testid="clipboard-status"
-            >
-              {clipboardStatus.state === "copying" && "Kopiëren..."}
-              {clipboardStatus.state === "success" && clipboardStatus.message}
-              {clipboardStatus.state === "error" && clipboardStatus.message}
-            </div>
-            <button
-              className="bulk-copy-button"
-              type="button"
-              onClick={replaceAll}
-              disabled={clipboardStatus.state === "copying"}
-              data-testid="replace-all"
-              title="Vervang alle geflagde items zonder ze te kopiëren"
-            >
-              <Sparkles size={16} /> Alles vervangen
-            </button>
-            <button
-              className="copy-button"
-              type="button"
-              onClick={copyOutput}
-              disabled={clipboardStatus.state === "copying"}
-            >
-              <Clipboard size={17} />{" "}
-              {clipboardStatus.state === "copying" ? "Kopiëren..." : "Kopieer veilige tekst"}
-            </button>
-          </section>
+              </section>
+            </>
+          ) : (
+            <SyntheticPanel
+              entries={syntheticEntries}
+              syntheticText={syntheticOutput}
+              model={ollamaModel}
+              formatHint={otherFormatHint}
+              aiBusy={aiBusy}
+              aiError={aiError}
+              onModelChange={setOllamaModel}
+              onFormatHintChange={setOtherFormatHint}
+              onGenerateAll={generateStandardReplacements}
+              onGenerateOther={(entry) => void generateOther(entry)}
+              onReplacementChange={updateSyntheticReplacement}
+              onCopy={() => void copySynthetic()}
+            />
+          )}
         </>
       )}
       {feedbackVisible && (

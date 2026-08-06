@@ -38,6 +38,7 @@ De app is bedoeld voor persoonlijk gebruik op één Mac. Het doel is gecontrolee
 5. Voeg gemiste passages handmatig toe met de `+`-knop.
 6. Gebruik eventueel `Alles vervangen` na de expliciete bevestiging.
 7. Controleer de vervangingen en klik daarna op `Kopieer veilige tekst`.
+8. Open optioneel tabblad `02 Synthetisch` om tokens te vervangen door realistische fictieve waarden.
 
 De bulkactie vervangt alle geflagde kandidaten in één keer, inclusief eerder genegeerde kandidaten, maar kopieert niets automatisch. Gebruik die actie alleen wanneer dat bewust gewenst is en controleer daarna de tekst voordat je op `Kopieer veilige tekst` klikt.
 
@@ -75,6 +76,12 @@ serienummer SN8844      -> SERIAL_1
 
 Dezelfde waarde krijgt binnen één actieve sessie hetzelfde token. Bij het sluiten van de app verdwijnt de mapping. Er is bewust nog geen vault, wachtwoordscherm, projectbestand of persistente opslag.
 
+## Synthetische tweede laag
+
+In tabblad `02 Synthetisch` worden goedgekeurde tokens opnieuw opgebouwd als realistische, volledig fictieve Nederlandse waarden. E-mailadressen, personen, telefoonnummers, IBAN's, BSN's, postcodes, datums, identifiers en links worden lokaal en deterministisch gegenereerd. De tekst wordt pas gekopieerd nadat alle vervangers zijn ingevuld.
+
+`OTHER` wordt niet willekeurig ingevuld. Hiervoor kan optioneel een lokaal Ollama-model worden gebruikt. De app communiceert hiervoor uitsluitend met `http://localhost:11434`; er worden geen cloudmodellen of externe endpoints ondersteund. In de tweede laag kan de gebruiker het model en een gewenste formaatbeschrijving opgeven, bijvoorbeeld `intern projectnummer met prefix PROJ-`.
+
 ## Technologie
 
 - React 19 en TypeScript
@@ -93,12 +100,22 @@ Vereisten:
 - macOS op Apple Silicon voor de huidige `.app`-build
 - Node.js 22 of nieuwer
 - Rust en Cargo
+- Ollama is alleen nodig voor AI-vervanging van `OTHER`
 
 Installeer dependencies:
 
 ```bash
 npm install
 ```
+
+Optionele lokale AI instellen:
+
+```bash
+ollama serve
+ollama pull llama3.2
+```
+
+De tweede laag gebruikt standaard het lokale model `llama3.2`. Een ander lokaal geïnstalleerd model kan in de app worden ingevuld. De app gebruikt uitsluitend Ollama op `http://localhost:11434`; zonder Ollama blijven alle standaardvervangers volledig offline beschikbaar.
 
 Start de webontwikkelserver:
 
@@ -164,7 +181,7 @@ De browser-e2e-tests geven Playwright expliciete klembordrechten en controleren 
 
 ## Privacy en beveiliging
 
-De MVP doet geen netwerkverzoeken tijdens de normale workflow en heeft geen analytics of telemetrie. Tauri-capabilities zijn beperkt tot de clipboard-plugin.
+De MVP doet geen externe netwerkverzoeken tijdens de normale workflow en heeft geen analytics of telemetrie. De optionele AI-functie voor `OTHER` praat uitsluitend met een lokaal Ollama-model op `localhost`. Tauri-capabilities zijn beperkt tot de clipboard-plugin.
 
 FileVault beschermt de Mac op schijfniveau. De app gebruikt in deze versie geen extra encryptielaag omdat de mapping niet persistent wordt opgeslagen. De brondata en mapping leven tijdens gebruik wel tijdelijk in het geheugen van de applicatie.
 

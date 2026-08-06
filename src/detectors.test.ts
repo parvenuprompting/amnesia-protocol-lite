@@ -74,6 +74,13 @@ describe("detectors", () => {
       ["serial", "SN8844"],
     ]);
   });
+  it("detects full URLs as link type", () => {
+    const result = detect("Bekijk https://example.com/path en http://test.org.");
+    expect(result.map((item) => [item.type, item.value])).toEqual([
+      ["link", "https://example.com/path"],
+      ["link", "http://test.org"],
+    ]);
+  });
   it("detects all sensitive entities in Dutch customer service document", () => {
     const doc = [
       "afzender ANWB",
@@ -81,7 +88,7 @@ describe("detectors", () => {
       "adres Wassenaarseweg 220",
       "2596 EC Den Haag",
       "telefoon 088 269 2222",
-      "internet anwb.nl",
+      "internet https://anwb.nl",
       "IBAN NL73 RABO 0333 0033 30",
       "BTW nr NL0056.37.727B01",
       "KvK nr 27.157.000",
@@ -104,7 +111,7 @@ describe("detectors", () => {
       ["postcode", "Wassenaarseweg 220"],
       ["postcode", "2596 EC Den Haag"],
       ["phone", "088 269 2222"],
-      ["email", "anwb.nl"],
+      ["link", "https://anwb.nl"],
       ["iban", "NL73 RABO 0333 0033 30"],
       ["reference", "NL0056.37.727B01"],
       ["reference", "27.157.000"],
