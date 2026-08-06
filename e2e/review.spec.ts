@@ -58,6 +58,22 @@ test("werkt verder zonder netwerkverbinding", async ({ page, context }) => {
   await expect(page.getByRole("complementary").getByText("E-mail", { exact: true })).toBeVisible();
 });
 
+test("start een lokale chat vanaf de homepage", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Start lokale chat" }).click();
+  await expect(page.getByText("LOKALE CHAT", { exact: true })).toBeVisible();
+  await expect(page.getByText("Vraag het lokale model", { exact: true })).not.toBeVisible();
+});
+
+test("opent instellingen vanaf de topbar", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Instellingen" }).click();
+  await expect(page.getByRole("dialog", { name: "Instellingen" })).toBeVisible();
+  await expect(page.getByLabel("Voorkeursmodel")).toBeVisible();
+  await page.getByRole("button", { name: "Sluit instellingen" }).click();
+  await expect(page.getByRole("dialog", { name: "Instellingen" })).not.toBeVisible();
+});
+
 test("accepteert alleen openstaande kandidaten", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /Start een nieuwe controle/ }).click();

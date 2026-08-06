@@ -112,6 +112,17 @@ Tabblad `03 Chat` biedt een eenvoudige chat met het geselecteerde lokale Ollama-
 
 De modelcatalogus kan optioneel modellen via Ollama downloaden. Voor elke download toont de app de geschatte omvang en aanbevolen RAM en vraagt hij expliciet om bevestiging. Zonder Ollama blijven review, pseudonimisering en standaard synthetische vervanging beschikbaar.
 
+## Instellingen
+
+Open het tandwiel in de topbar om voorkeuren te beheren. De voorkeuren worden tussen appstarts lokaal bewaard:
+
+- voorkeursmodel voor lokale AI;
+- taal voor synthetische waarden en lokale prompts;
+- automatische clipboard-cleartimer;
+- lokale modellen verversen en nieuwe modellen downloaden.
+
+In de chat kan het model ook direct via de aanklikbare modelnaam worden gewisseld. Die keuze geldt voor het volgende antwoord; de voorkeursinstelling blijft apart beheerd in Instellingen. Alleen voorkeuren worden persistent opgeslagen. Brondata, mappings en chatgeschiedenis blijven sessiegebonden.
+
 ## Technologie
 
 - React 19 en TypeScript

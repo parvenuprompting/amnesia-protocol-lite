@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { Check, Eraser, EyeOff, RotateCcw, RotateCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Check, Eraser, EyeOff, RotateCcw, RotateCw, Settings } from "lucide-react";
 import { AppDialog } from "./AppDialog";
-import type { ClipboardClearDelay } from "./clipboard";
 import {
   CHAT_MAX_CONTEXT_TOKENS,
   CHAT_MAX_OUTPUT_TOKENS,
@@ -24,31 +23,27 @@ import {
 } from "./ollama";
 import { ReviewBottomBar } from "./ReviewBottomBar";
 import { ReviewWorkspace } from "./ReviewWorkspace";
+import { SettingsPanel } from "./SettingsPanel";
 import { SyntheticPanel, type SyntheticEntry } from "./SyntheticPanel";
-import {
-  createSyntheticMap,
-  parseSyntheticMarkers,
-  replaceSyntheticMarkers,
-  type SyntheticLocale,
-} from "./synthetic";
+import { createSyntheticMap, parseSyntheticMarkers, replaceSyntheticMarkers } from "./synthetic";
 import { useDialog } from "./useDialog";
 import { useClipboard } from "./useClipboard";
 import { reviewTypeOptions, useReviewState } from "./useReviewState";
+import { useAppSettings } from "./settings";
 
 const initialText =
   "Plak hier de tekst die je wilt controleren. Bijvoorbeeld: klantnummer 123456 of e-mail klant@example.com.";
 
 function App() {
   const [screen, setScreen] = useState<"home" | "review" | "synthetic" | "chat">("home");
+  const { settings, updateSettings } = useAppSettings();
   const [message, setMessage] = useState("Klaar voor beoordeling");
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [toastKey, setToastKey] = useState(0);
-  const [clipboardClearAfter, setClipboardClearAfter] = useState<ClipboardClearDelay>(60_000);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [syntheticInput, setSyntheticInput] = useState("");
   const [syntheticValues, setSyntheticValues] = useState<Map<string, string>>(new Map());
-  const [ollamaModel, setOllamaModel] = useState("llama3.2");
   const [otherFormatHint, setOtherFormatHint] = useState("");
-  const [syntheticLocale, setSyntheticLocale] = useState<SyntheticLocale>("nl");
   const [localModels, setLocalModels] = useState<{ name: string; parameterSize?: string }[]>([]);
   const [ollamaStatus, setOllamaStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [ollamaError, setOllamaError] = useState("");
@@ -63,6 +58,7 @@ function App() {
   const [chatSentAt, setChatSentAt] = useState<number[]>([]);
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [chatModel, setChatModel] = useState(settings.preferredModel);
   const [sessionSeed] = useState(() => Date.now());
   const { dialog, askConfirm, askPrompt } = useDialog();
 
@@ -77,7 +73,7 @@ function App() {
     onToast: showToast,
     askConfirm,
   });
-  const clipboard = useClipboard(showToast, clipboardClearAfter);
+  const clipboard = useClipboard(showToast, settings.clipboardClearAfter);
   const hardwareInfo = useMemo(() => {
     const cores = navigator.hardwareConcurrency
       ? `${navigator.hardwareConcurrency} CPU-cores`
@@ -134,14 +130,14 @@ function App() {
     const generated = createSyntheticMap(
       syntheticMarkers.map((marker) => ({ type: marker.type, value: marker.token })),
       sessionSeed,
-      syntheticLocale,
+      settings.syntheticLocale,
     );
     setSyntheticValues((current) => new Map([...current, ...generated]));
     showToast(`${generated.size} standaardvervanger${generated.size === 1 ? "" : "s"} gegenereerd`);
   };
 
   const generateOther = async (entry: SyntheticEntry) => {
-    if (!ollamaModel.trim()) {
+    if (!settings.preferredModel.trim()) {
       setAiError("Vul eerst de naam van een lokaal Ollama-model in.");
       return;
     }
@@ -151,9 +147,9 @@ function App() {
       const replacement = await generateWithOllama(
         entry.token,
         otherFormatHint,
-        ollamaModel.trim(),
+        settings.preferredModel.trim(),
         undefined,
-        syntheticLocale,
+        settings.syntheticLocale,
       );
       setSyntheticValues((current) => new Map(current).set(entry.token, replacement));
     } catch (error) {
@@ -166,21 +162,29 @@ function App() {
     }
   };
 
-  const refreshModels = async () => {
+  const refreshModels = useCallback(async () => {
     setOllamaStatus("loading");
     setOllamaError("");
     try {
-      setLocalModels(await listOllamaModels());
+      const models = await listOllamaModels();
+      setLocalModels(models);
+      if (models.length && !models.some((item) => item.name === settings.preferredModel)) {
+        updateSettings({ preferredModel: models[0].name });
+        setChatModel(models[0].name);
+      }
       setOllamaStatus("ready");
     } catch (error) {
       setOllamaStatus("error");
       setOllamaError(
-        error instanceof Error
-          ? "Ollama is niet actief"
-          : "Lokale modellen konden niet worden opgehaald",
+        error instanceof Error ? error.message : "Lokale modellen konden niet worden opgehaald",
       );
     }
-  };
+  }, [settings.preferredModel, updateSettings]);
+
+  useEffect(() => {
+    if (screen !== "chat" || ollamaStatus !== "idle") return;
+    void refreshModels();
+  }, [ollamaStatus, refreshModels, screen]);
 
   const pullModel = async () => {
     const selected = OLLAMA_CATALOG.find((item) => item.name === downloadModel);
@@ -203,7 +207,8 @@ function App() {
             : "";
         setPullProgress(`${progress.status}${percentage}`);
       });
-      setOllamaModel(downloadModel);
+      updateSettings({ preferredModel: downloadModel });
+      setChatModel(downloadModel);
       await refreshModels();
       showToast(`${downloadModel} is lokaal geïnstalleerd`);
     } catch (error) {
@@ -283,7 +288,7 @@ function App() {
     let answer = "";
     try {
       await chatWithOllama(
-        ollamaModel,
+        chatModel,
         requestMessages,
         { numCtx: CHAT_MAX_CONTEXT_TOKENS, numPredict: CHAT_MAX_OUTPUT_TOKENS },
         (progress) => {
@@ -337,10 +342,18 @@ function App() {
           </button>
           <span className="divider" />
           <span className="session-label">Sessiegeheugen · actief</span>
+          <button
+            className="icon-button"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Instellingen"
+            title="Instellingen"
+          >
+            <Settings size={16} />
+          </button>
         </div>
       </header>
       {screen === "home" ? (
-        <HomeScreen onStart={() => setScreen("review")} />
+        <HomeScreen onStart={() => setScreen("review")} onStartChat={() => setScreen("chat")} />
       ) : (
         <>
           <nav className="workspace-tabs" aria-label="Werklaag">
@@ -396,12 +409,10 @@ function App() {
                 selectedType={review.selectedType}
                 acceptedCount={review.acceptedCount}
                 clipboardStatus={clipboard.status}
-                clipboardClearAfter={clipboardClearAfter}
                 onTypeChange={review.setSelectedType}
                 onAcceptPending={() => void review.acceptPending()}
                 onForceAll={() => void review.forceAll()}
                 onCopy={() => void copyOutput()}
-                onClipboardClearAfterChange={setClipboardClearAfter}
               />
             </>
           ) : screen === "synthetic" ? (
@@ -409,15 +420,6 @@ function App() {
               entries={syntheticEntries}
               sourceText={syntheticInput}
               syntheticText={syntheticOutput}
-              model={ollamaModel}
-              localModels={localModels}
-              ollamaStatus={ollamaStatus}
-              ollamaError={ollamaError}
-              downloadModel={downloadModel}
-              pullBusy={pullBusy}
-              pullProgress={pullProgress}
-              hardwareInfo={hardwareInfo}
-              locale={syntheticLocale}
               formatHint={otherFormatHint}
               aiBusy={aiBusy}
               aiError={aiError}
@@ -425,11 +427,6 @@ function App() {
                 setSyntheticInput(value);
                 setAiError("");
               }}
-              onModelChange={setOllamaModel}
-              onRefreshModels={() => void refreshModels()}
-              onDownloadModelChange={setDownloadModel}
-              onPullModel={() => void pullModel()}
-              onLocaleChange={setSyntheticLocale}
               onFormatHintChange={setOtherFormatHint}
               onGenerateAll={generateStandardReplacements}
               onGenerateOther={(entry) => void generateOther(entry)}
@@ -442,7 +439,9 @@ function App() {
             <ChatPanel
               messages={chatMessages}
               input={chatInput}
-              model={ollamaModel}
+              model={chatModel}
+              localModels={localModels}
+              onModelChange={setChatModel}
               contextAttached={Boolean(chatContext)}
               contextLength={chatContext.length}
               rateStatus={`${chatSentAt.filter((timestamp) => Date.now() - timestamp < CHAT_RATE_WINDOW_MS).length}/${CHAT_MAX_REQUESTS_PER_WINDOW} vragen deze minuut`}
@@ -459,6 +458,7 @@ function App() {
               }}
               onAttachContext={attachChatContext}
               onDetachContext={() => setChatContext("")}
+              onCopyMessage={(content) => void clipboard.copy(content, "Chatantwoord gekopieerd")}
             />
           )}
         </>
@@ -470,6 +470,30 @@ function App() {
         </div>
       )}
       <AppDialog dialog={dialog} />
+      {settingsOpen && (
+        <SettingsPanel
+          preferredModel={settings.preferredModel}
+          syntheticLocale={settings.syntheticLocale}
+          clipboardClearAfter={settings.clipboardClearAfter}
+          localModels={localModels}
+          ollamaStatus={ollamaStatus}
+          ollamaError={ollamaError}
+          downloadModel={downloadModel}
+          pullBusy={pullBusy}
+          pullProgress={pullProgress}
+          hardwareInfo={hardwareInfo}
+          onPreferredModelChange={(value) => {
+            updateSettings({ preferredModel: value });
+            setChatModel(value);
+          }}
+          onLocaleChange={(value) => updateSettings({ syntheticLocale: value })}
+          onClipboardClearAfterChange={(value) => updateSettings({ clipboardClearAfter: value })}
+          onRefreshModels={() => void refreshModels()}
+          onDownloadModelChange={setDownloadModel}
+          onPullModel={() => void pullModel()}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
       <footer>
         <span>
           <Eraser size={13} /> Alleen sessiegeheugen · geen opslag
