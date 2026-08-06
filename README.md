@@ -1,5 +1,12 @@
 # Amnesia Protocol Lite
 
+[![GitHub last commit](https://img.shields.io/github/last-commit/parvenuprompting/amnesia-protocol-lite?style=flat-square)](https://github.com/parvenuprompting/amnesia-protocol-lite/commits/main)
+[![Repository size](https://img.shields.io/github/repo-size/parvenuprompting/amnesia-protocol-lite?style=flat-square)](https://github.com/parvenuprompting/amnesia-protocol-lite)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=20232A)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev/)
+[![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=flat-square&logo=tauri&logoColor=111111)](https://tauri.app/)
+
 Amnesia Protocol is een lokale, offline-first privacyfilter voor tekst. De app detecteert gevoelige klant- en transactiedata, laat elk resultaat door een mens beoordelen en vervangt goedgekeurde waarden door consistente, getypeerde pseudoniemen voordat de tekst in een ander venster of een cloud-LLM wordt gebruikt.
 
 De app is bedoeld voor persoonlijk gebruik op één Mac. Het doel is gecontroleerde pseudonimisering, niet anonimiteit.
