@@ -125,7 +125,7 @@ Open het tandwiel in de topbar om voorkeuren te beheren. De voorkeuren worden tu
 - automatische clipboard-cleartimer;
 - lokale modellen verversen en nieuwe modellen downloaden.
 
-In de chat toont de modelbadge welk lokaal model actief is. Mistral krijgt voorrang; Gemma 3 1B wordt automatisch gebruikt als fallback. Alleen voorkeuren worden persistent opgeslagen. Brondata, mappings en chatgeschiedenis blijven sessiegebonden.
+In de chat toont de modelbadge welk lokaal model actief is. Mistral en compatibele Mistral-varianten zoals `dolphin-mistral:latest` krijgen voorrang; Gemma 3 1B wordt automatisch gebruikt als fallback. Alleen voorkeuren worden persistent opgeslagen. Brondata, mappings en chatgeschiedenis blijven sessiegebonden.
 
 ## Technologie
 
@@ -162,7 +162,7 @@ ollama pull mistral
 ollama pull gemma3:1b
 ```
 
-De tweede laag gebruikt automatisch `mistral:latest` als primair lokaal model. Als Mistral niet beschikbaar is, valt de app terug op het lichte `gemma3:1b`-model. Via `Ververs lokale Ollama-modellen` worden alleen lokaal geïnstalleerde modellen gecontroleerd. Vanuit Instellingen kunnen Mistral of de fallback expliciet worden gedownload, met een waarschuwing voor downloadgrootte en aanbevolen RAM. De app gebruikt uitsluitend Ollama op `http://localhost:11434`; zonder Ollama blijven alle standaardvervangers volledig offline beschikbaar.
+De tweede laag gebruikt automatisch een lokaal Mistral-model, inclusief compatibele varianten zoals `dolphin-mistral:latest`. Als geen Mistral-variant beschikbaar is, valt de app terug op het lichte `gemma3:1b`-model. Via `Ververs lokale Ollama-modellen` worden alleen lokaal geïnstalleerde modellen gecontroleerd. Vanuit Instellingen kunnen Mistral of de fallback expliciet worden gedownload, met een waarschuwing voor downloadgrootte en aanbevolen RAM. De app gebruikt uitsluitend Ollama op `http://localhost:11434`; zonder Ollama blijven alle standaardvervangers volledig offline beschikbaar.
 
 Start de webontwikkelserver:
 
