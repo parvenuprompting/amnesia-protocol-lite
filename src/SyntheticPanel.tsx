@@ -1,4 +1,5 @@
 import { Clipboard, RefreshCw, Sparkles } from "lucide-react";
+import { OLLAMA_CATALOG, type OllamaLocalModel } from "./ollama";
 import type { SyntheticLocale } from "./synthetic";
 import type { DetectionType } from "./types";
 import { TYPE_LABELS } from "./types";
@@ -16,12 +17,22 @@ type SyntheticPanelProps = {
   sourceText: string;
   syntheticText: string;
   model: string;
+  localModels: OllamaLocalModel[];
+  ollamaStatus: "idle" | "loading" | "ready" | "error";
+  ollamaError: string;
+  downloadModel: string;
+  pullBusy: boolean;
+  pullProgress: string;
+  hardwareInfo: string;
   locale: SyntheticLocale;
   formatHint: string;
   aiBusy: boolean;
   aiError: string;
   onSourceTextChange: (value: string) => void;
   onModelChange: (value: string) => void;
+  onRefreshModels: () => void;
+  onDownloadModelChange: (value: string) => void;
+  onPullModel: () => void;
   onLocaleChange: (value: SyntheticLocale) => void;
   onFormatHintChange: (value: string) => void;
   onGenerateAll: () => void;
@@ -35,12 +46,22 @@ export function SyntheticPanel({
   sourceText,
   syntheticText,
   model,
+  localModels,
+  ollamaStatus,
+  ollamaError,
+  downloadModel,
+  pullBusy,
+  pullProgress,
+  hardwareInfo,
   locale,
   formatHint,
   aiBusy,
   aiError,
   onSourceTextChange,
   onModelChange,
+  onRefreshModels,
+  onDownloadModelChange,
+  onPullModel,
   onLocaleChange,
   onFormatHintChange,
   onGenerateAll,
@@ -109,15 +130,69 @@ export function SyntheticPanel({
               <option value="en">English</option>
             </select>
           </label>
-          <label>
-            <span>Ollama-model voor Overig</span>
-            <input
-              type="text"
-              value={model}
-              onChange={(event) => onModelChange(event.target.value)}
-              placeholder="llama3.2"
-            />
-          </label>
+          <div className="ollama-model-row">
+            <label>
+              <span>Lokaal model voor Overig</span>
+              <select value={model} onChange={(event) => onModelChange(event.target.value)}>
+                {!localModels.some((item) => item.name === model) && (
+                  <option value={model}>{model} (standaard)</option>
+                )}
+                {localModels.map((item) => (
+                  <option key={item.name} value={item.name}>
+                    {item.name}
+                    {item.parameterSize ? ` · ${item.parameterSize}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={onRefreshModels}
+              disabled={ollamaStatus === "loading"}
+              aria-label="Ververs lokale Ollama-modellen"
+              title="Ververs lokale Ollama-modellen"
+            >
+              <RefreshCw size={15} />
+            </button>
+          </div>
+          <p className={`ollama-status ${ollamaStatus}`}>
+            {ollamaStatus === "loading" && "Lokale modellen ophalen..."}
+            {ollamaStatus === "ready" &&
+              `${localModels.length} lokaal model${localModels.length === 1 ? "" : "len"} gevonden`}
+            {ollamaStatus === "error" && ollamaError}
+            {ollamaStatus === "idle" &&
+              "Ollama is optioneel; standaardvervangers werken zonder Ollama."}
+          </p>
+          <div className="ollama-download-box">
+            <label>
+              <span>Model downloaden via Ollama</span>
+              <select
+                value={downloadModel}
+                onChange={(event) => onDownloadModelChange(event.target.value)}
+                disabled={pullBusy}
+              >
+                {OLLAMA_CATALOG.map((item) => (
+                  <option key={item.name} value={item.name}>
+                    {item.label} · {item.downloadSize}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {(() => {
+              const selected = OLLAMA_CATALOG.find((item) => item.name === downloadModel);
+              return selected ? (
+                <p className="ollama-hardware-warning">
+                  {selected.description} {selected.recommendedRam} aanbevolen. Dit downloadt data
+                  via Ollama en slaat het lokaal op. Hardware: {hardwareInfo}.
+                </p>
+              ) : null;
+            })()}
+            <button type="button" className="ai-button" onClick={onPullModel} disabled={pullBusy}>
+              <Sparkles size={15} />{" "}
+              {pullBusy ? `Download: ${pullProgress || "bezig"}` : "Download lokaal model"}
+            </button>
+          </div>
           <label>
             <span>Gewenst formaat voor Overig</span>
             <input

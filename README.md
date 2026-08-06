@@ -57,6 +57,13 @@ De app is ontworpen voor persoonlijk gebruik op één Mac. Het doel is gecontrol
 6. Controleer en corrigeer de fictieve waarden.
 7. Klik op `Kopieer synthetische tekst`.
 
+### Laag 3: Lokale chat
+
+1. Open tabblad `03 Chat`.
+2. Stel vragen aan het geselecteerde lokale Ollama-model.
+3. Voeg alleen via de icon-only contextknop de synthetische output toe.
+4. Wis het gesprek wanneer je de sessiecontext wilt verwijderen.
+
 De veilige bulkactie accepteert alleen openstaande kandidaten. `Forceer alle kandidaten` is een aparte, expliciet bevestigde actie die ook eerder genegeerde kandidaten accepteert. Geen van beide acties kopieert automatisch; controleer de tekst altijd voordat je op `Kopieer veilige tekst` klikt.
 
 ## Detectie
@@ -99,6 +106,12 @@ In tabblad `02 Synthetisch` plakt de gebruiker eerst zelf de veilige tekst uit l
 
 `OTHER` wordt niet willekeurig ingevuld. Hiervoor kan optioneel een lokaal Ollama-model worden gebruikt. De app communiceert hiervoor uitsluitend met `http://localhost:11434`; er worden geen cloudmodellen of externe endpoints ondersteund. De gekozen taal wordt ook aan de lokale prompt meegegeven. In de tweede laag kan de gebruiker het model en een gewenste formaatbeschrijving opgeven, bijvoorbeeld `intern projectnummer met prefix PROJ-`.
 
+## Lokale chat
+
+Tabblad `03 Chat` biedt een eenvoudige chat met het geselecteerde lokale Ollama-model. De oorspronkelijke bronlaag wordt nooit automatisch als context meegestuurd. Met de icon-only contextknop kan de gebruiker expliciet de synthetische output uit laag 2 toevoegen. De chat gebruikt maximaal 4.000 contexttokens, maximaal 512 outputtokens, maximaal 5 vragen per minuut en minimaal 3 seconden tussen vragen. Chatgeschiedenis bestaat alleen in het sessiegeheugen.
+
+De modelcatalogus kan optioneel modellen via Ollama downloaden. Voor elke download toont de app de geschatte omvang en aanbevolen RAM en vraagt hij expliciet om bevestiging. Zonder Ollama blijven review, pseudonimisering en standaard synthetische vervanging beschikbaar.
+
 ## Technologie
 
 - React 19 en TypeScript
@@ -133,7 +146,7 @@ ollama serve
 ollama pull llama3.2
 ```
 
-De tweede laag gebruikt standaard het lokale model `llama3.2`. Een ander lokaal geïnstalleerd model kan in de app worden ingevuld. De app gebruikt uitsluitend Ollama op `http://localhost:11434`; zonder Ollama blijven alle standaardvervangers volledig offline beschikbaar.
+De tweede laag gebruikt standaard het lokale model `llama3.2`. Via `Ververs lokale Ollama-modellen` kunnen geïnstalleerde modellen worden geladen. De app bevat daarnaast een kleine catalogus met modellen die optioneel via Ollama kunnen worden gedownload. Voor iedere download toont de app de geschatte omvang en aanbevolen hoeveelheid RAM en vraagt hij expliciet om bevestiging. De app gebruikt uitsluitend Ollama op `http://localhost:11434`; zonder Ollama blijven alle standaardvervangers volledig offline beschikbaar.
 
 Start de webontwikkelserver:
 
@@ -228,6 +241,8 @@ src/
   ReviewWorkspace.tsx Revieweditor en kandidaatlijst
   ReviewBottomBar.tsx Reviewacties en clipboardknoppen
   AppDialog.tsx       Modalweergave en focusbeheer
+  ChatPanel.tsx       Lokale chat met optionele synthetische context
+  chat.ts             Chatlimieten en contextbeheer
   useDialog.ts        Confirm- en promptlogica
   useReviewState.ts   Debounced detectie, history en reviewacties
   useClipboard.ts     Clipboardstatus en readback-verificatie
@@ -247,4 +262,4 @@ src-tauri/
 
 ## Status
 
-De huidige implementatie bevat de Fase 1/2-MVP: lokale review, uitgebreide Nederlandse detectieregels, sessiegebonden pseudonimisering, een onafhankelijk geplakte synthetische tweede laag, optionele lokale Ollama-AI, klembordcontrole, snapshot-history, gescheiden veilige en geforceerde bulkacties en debounce voor langere teksten. De tests en productiebuild moeten groen zijn voordat wijzigingen als afgerond worden beschouwd.
+De huidige implementatie bevat de Fase 1/2-MVP plus een lokale chatlaag: lokale review, uitgebreide Nederlandse detectieregels, sessiegebonden pseudonimisering, een onafhankelijk geplakte synthetische tweede laag, Engelse synthetische waarden, optionele lokale Ollama-AI, lokale modeldownloads met hardwarewaarschuwing, clipboardcontrole, snapshot-history, gescheiden veilige en geforceerde bulkacties, debounce voor langere teksten en een begrensde lokale chat. De tests en productiebuild moeten groen zijn voordat wijzigingen als afgerond worden beschouwd.

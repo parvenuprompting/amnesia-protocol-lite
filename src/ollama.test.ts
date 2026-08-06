@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { generateWithOllama } from "./ollama";
+import { chatWithOllama, generateWithOllama, listOllamaModels, pullOllamaModel } from "./ollama";
 
 describe("generateWithOllama", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -35,5 +35,63 @@ describe("generateWithOllama", () => {
     const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
 
     expect(request.prompt).toContain("in English");
+  });
+
+  it("lists local models from Ollama", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          models: [{ name: "llama3.2", size: 2_000_000_000, details: { parameter_size: "3B" } }],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(listOllamaModels()).resolves.toEqual([
+      { name: "llama3.2", size: 2_000_000_000, parameterSize: "3B" },
+    ]);
+  });
+
+  it("reports streamed model download progress", async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode('{"status":"downloading","completed":50,"total":100}\n'),
+        );
+        controller.enqueue(new TextEncoder().encode('{"status":"success"}\n'));
+        controller.close();
+      },
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(stream, { status: 200 }));
+    const progress: string[] = [];
+
+    await pullOllamaModel("llama3.2", (item) => progress.push(item.status));
+    expect(progress).toEqual(["downloading", "success"]);
+  });
+
+  it("streams chat response content to the caller", async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode('{"message":{"content":"Hallo"},"done":false}\n'),
+        );
+        controller.enqueue(
+          new TextEncoder().encode('{"message":{"content":" wereld"},"done":true}\n'),
+        );
+        controller.close();
+      },
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(stream, { status: 200 }));
+    const chunks: string[] = [];
+
+    await expect(
+      chatWithOllama(
+        "llama3.2",
+        [{ role: "user", content: "Hallo" }],
+        { numCtx: 4000, numPredict: 512 },
+        (progress) => chunks.push(progress.content),
+      ),
+    ).resolves.toBe("Hallo wereld");
+    expect(chunks).toEqual(["Hallo", " wereld"]);
   });
 });

@@ -2,8 +2,26 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Eraser, EyeOff, RotateCcw, RotateCw } from "lucide-react";
 import { AppDialog } from "./AppDialog";
 import type { ClipboardClearDelay } from "./clipboard";
+import {
+  CHAT_MAX_CONTEXT_TOKENS,
+  CHAT_MAX_OUTPUT_TOKENS,
+  CHAT_MAX_REQUESTS_PER_WINDOW,
+  CHAT_RATE_WINDOW_MS,
+  estimateTokens,
+  getChatRateLimitMessage,
+  trimChatHistory,
+  type ChatMessage,
+} from "./chat";
+import { ChatPanel } from "./ChatPanel";
 import { HomeScreen } from "./HomeScreen";
-import { generateWithOllama } from "./ollama";
+import {
+  generateWithOllama,
+  chatWithOllama,
+  listOllamaModels,
+  OLLAMA_CATALOG,
+  pullOllamaModel,
+  type OllamaPullProgress,
+} from "./ollama";
 import { ReviewBottomBar } from "./ReviewBottomBar";
 import { ReviewWorkspace } from "./ReviewWorkspace";
 import { SyntheticPanel, type SyntheticEntry } from "./SyntheticPanel";
@@ -21,7 +39,7 @@ const initialText =
   "Plak hier de tekst die je wilt controleren. Bijvoorbeeld: klantnummer 123456 of e-mail klant@example.com.";
 
 function App() {
-  const [screen, setScreen] = useState<"home" | "review" | "synthetic">("home");
+  const [screen, setScreen] = useState<"home" | "review" | "synthetic" | "chat">("home");
   const [message, setMessage] = useState("Klaar voor beoordeling");
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [toastKey, setToastKey] = useState(0);
@@ -31,8 +49,20 @@ function App() {
   const [ollamaModel, setOllamaModel] = useState("llama3.2");
   const [otherFormatHint, setOtherFormatHint] = useState("");
   const [syntheticLocale, setSyntheticLocale] = useState<SyntheticLocale>("nl");
+  const [localModels, setLocalModels] = useState<{ name: string; parameterSize?: string }[]>([]);
+  const [ollamaStatus, setOllamaStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [ollamaError, setOllamaError] = useState("");
+  const [downloadModel, setDownloadModel] = useState(OLLAMA_CATALOG[0].name);
+  const [pullBusy, setPullBusy] = useState(false);
+  const [pullProgress, setPullProgress] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatContext, setChatContext] = useState("");
+  const [chatSentAt, setChatSentAt] = useState<number[]>([]);
+  const [chatBusy, setChatBusy] = useState(false);
+  const [chatError, setChatError] = useState("");
   const [sessionSeed] = useState(() => Date.now());
   const { dialog, askConfirm, askPrompt } = useDialog();
 
@@ -48,6 +78,16 @@ function App() {
     askConfirm,
   });
   const clipboard = useClipboard(showToast, clipboardClearAfter);
+  const hardwareInfo = useMemo(() => {
+    const cores = navigator.hardwareConcurrency
+      ? `${navigator.hardwareConcurrency} CPU-cores`
+      : "hardware onbekend";
+    const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+    const memory = deviceMemory
+      ? `${deviceMemory} GB RAM gerapporteerd`
+      : "RAM niet beschikbaar via macOS-webview";
+    return `${cores}, ${memory}`;
+  }, []);
 
   useEffect(() => {
     if (!feedbackVisible) return;
@@ -126,6 +166,55 @@ function App() {
     }
   };
 
+  const refreshModels = async () => {
+    setOllamaStatus("loading");
+    setOllamaError("");
+    try {
+      setLocalModels(await listOllamaModels());
+      setOllamaStatus("ready");
+    } catch (error) {
+      setOllamaStatus("error");
+      setOllamaError(
+        error instanceof Error
+          ? "Ollama is niet actief"
+          : "Lokale modellen konden niet worden opgehaald",
+      );
+    }
+  };
+
+  const pullModel = async () => {
+    const selected = OLLAMA_CATALOG.find((item) => item.name === downloadModel);
+    if (!selected) return;
+    if (
+      !(await askConfirm(
+        `${selected.label} downloadt ongeveer ${selected.downloadSize} en gebruikt aanbevolen ${selected.recommendedRam}. Dit vereist een internetverbinding via Ollama en lokale schijfruimte. Doorgaan?`,
+        "Lokaal Ollama-model downloaden",
+      ))
+    )
+      return;
+    setPullBusy(true);
+    setPullProgress("starten");
+    setOllamaError("");
+    try {
+      await pullOllamaModel(downloadModel, (progress: OllamaPullProgress) => {
+        const percentage =
+          progress.total && progress.completed
+            ? ` ${Math.round((progress.completed / progress.total) * 100)}%`
+            : "";
+        setPullProgress(`${progress.status}${percentage}`);
+      });
+      setOllamaModel(downloadModel);
+      await refreshModels();
+      showToast(`${downloadModel} is lokaal geïnstalleerd`);
+    } catch (error) {
+      setOllamaStatus("error");
+      setOllamaError(error instanceof Error ? error.message : "Modeldownload mislukt");
+    } finally {
+      setPullBusy(false);
+      setPullProgress("");
+    }
+  };
+
   const copySynthetic = async () => {
     if (!syntheticEntries.length) {
       showToast("Er zijn nog geen markers om te vervangen");
@@ -139,6 +228,79 @@ function App() {
       syntheticOutput,
       `${syntheticEntries.length} synthetische vervangers gekopieerd`,
     );
+  };
+
+  const attachChatContext = () => {
+    if (!syntheticEntries.length || syntheticEntries.some((entry) => !entry.replacement.trim())) {
+      showToast("Genereer eerst volledige synthetische output");
+      return;
+    }
+    setChatContext(syntheticOutput);
+    showToast("Synthetische output als chatcontext toegevoegd");
+  };
+
+  const sendChat = async () => {
+    const question = chatInput.trim();
+    if (!question || chatBusy) return;
+    const now = Date.now();
+    const rateError = getChatRateLimitMessage(chatSentAt, now);
+    if (rateError) {
+      setChatError(rateError);
+      return;
+    }
+    if (estimateTokens(question) > CHAT_MAX_CONTEXT_TOKENS) {
+      setChatError(
+        `Je vraag is te lang. Gebruik maximaal ongeveer ${CHAT_MAX_CONTEXT_TOKENS} tokens.`,
+      );
+      return;
+    }
+
+    const userMessage: ChatMessage = { role: "user", content: question };
+    const systemContent = [
+      "Je bent een lokale, behulpzame assistent in Amnesia Protocol.",
+      "Geef beknopte, duidelijke antwoorden. Verzin geen persoonlijke gegevens.",
+      chatContext
+        ? `De gebruiker heeft deze synthetische tekst als context toegevoegd:\n${chatContext}`
+        : "Er is geen documentcontext toegevoegd.",
+    ].join("\n\n");
+    const history = trimChatHistory(
+      chatMessages,
+      CHAT_MAX_CONTEXT_TOKENS - estimateTokens(systemContent),
+    );
+    const requestMessages: ChatMessage[] = [
+      { role: "system", content: systemContent },
+      ...history,
+      userMessage,
+    ];
+    setChatInput("");
+    setChatError("");
+    setChatSentAt((items) => [
+      ...items.filter((timestamp) => now - timestamp < CHAT_RATE_WINDOW_MS),
+      now,
+    ]);
+    setChatMessages((items) => [...items, userMessage, { role: "assistant", content: "" }]);
+    setChatBusy(true);
+    let answer = "";
+    try {
+      await chatWithOllama(
+        ollamaModel,
+        requestMessages,
+        { numCtx: CHAT_MAX_CONTEXT_TOKENS, numPredict: CHAT_MAX_OUTPUT_TOKENS },
+        (progress) => {
+          answer += progress.content;
+          setChatMessages((items) => {
+            const next = [...items];
+            next[next.length - 1] = { role: "assistant", content: answer };
+            return next;
+          });
+        },
+      );
+    } catch (error) {
+      setChatMessages((items) => items.slice(0, -1));
+      setChatError(error instanceof Error ? error.message : "Chatantwoord mislukt");
+    } finally {
+      setChatBusy(false);
+    }
   };
 
   return (
@@ -197,6 +359,13 @@ function App() {
             >
               02 Synthetisch
             </button>
+            <button
+              type="button"
+              className={screen === "chat" ? "active" : ""}
+              onClick={() => setScreen("chat")}
+            >
+              03 Chat
+            </button>
           </nav>
           {screen === "review" ? (
             <>
@@ -235,12 +404,19 @@ function App() {
                 onClipboardClearAfterChange={setClipboardClearAfter}
               />
             </>
-          ) : (
+          ) : screen === "synthetic" ? (
             <SyntheticPanel
               entries={syntheticEntries}
               sourceText={syntheticInput}
               syntheticText={syntheticOutput}
               model={ollamaModel}
+              localModels={localModels}
+              ollamaStatus={ollamaStatus}
+              ollamaError={ollamaError}
+              downloadModel={downloadModel}
+              pullBusy={pullBusy}
+              pullProgress={pullProgress}
+              hardwareInfo={hardwareInfo}
               locale={syntheticLocale}
               formatHint={otherFormatHint}
               aiBusy={aiBusy}
@@ -250,6 +426,9 @@ function App() {
                 setAiError("");
               }}
               onModelChange={setOllamaModel}
+              onRefreshModels={() => void refreshModels()}
+              onDownloadModelChange={setDownloadModel}
+              onPullModel={() => void pullModel()}
               onLocaleChange={setSyntheticLocale}
               onFormatHintChange={setOtherFormatHint}
               onGenerateAll={generateStandardReplacements}
@@ -258,6 +437,28 @@ function App() {
                 setSyntheticValues((current) => new Map(current).set(entry.token, value))
               }
               onCopy={() => void copySynthetic()}
+            />
+          ) : (
+            <ChatPanel
+              messages={chatMessages}
+              input={chatInput}
+              model={ollamaModel}
+              contextAttached={Boolean(chatContext)}
+              contextLength={chatContext.length}
+              rateStatus={`${chatSentAt.filter((timestamp) => Date.now() - timestamp < CHAT_RATE_WINDOW_MS).length}/${CHAT_MAX_REQUESTS_PER_WINDOW} vragen deze minuut`}
+              busy={chatBusy}
+              error={chatError}
+              onInputChange={(value) => {
+                setChatInput(value);
+                setChatError("");
+              }}
+              onSend={() => void sendChat()}
+              onClear={() => {
+                setChatMessages([]);
+                setChatError("");
+              }}
+              onAttachContext={attachChatContext}
+              onDetachContext={() => setChatContext("")}
             />
           )}
         </>
