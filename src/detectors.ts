@@ -129,6 +129,65 @@ const contextPatterns: ContextPattern[] = [
   },
 ];
 
+const terminalContextPatterns: ContextPattern[] = [
+  {
+    type: "accessToken",
+    regex:
+      /\b(?:authorization|proxy-authorization)\s*:\s*bearer\s+(?<value>[A-Za-z0-9._~+/-]{12,})/gi,
+    confidence: 0.99,
+  },
+  {
+    type: "secret",
+    regex:
+      /\b(?:password|passwd|secret|token|api[_-]?key|access[_-]?key)\s*[=:]\s*["']?(?<value>[^\s"']{8,})["']?/gi,
+    confidence: 0.94,
+  },
+  {
+    type: "account",
+    regex: /(?:\/Users\/|\/home\/|C:\\\\Users\\)(?<value>[A-Za-z0-9._-]{2,})/g,
+    confidence: 0.96,
+  },
+];
+
+const terminalPatterns: Array<{ type: DetectionType; regex: RegExp; confidence: number }> = [
+  {
+    type: "privateKey",
+    regex: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+?-----END [A-Z ]*PRIVATE KEY-----/g,
+    confidence: 1,
+  },
+  {
+    type: "jwt",
+    regex: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g,
+    confidence: 0.99,
+  },
+  {
+    type: "apiKey",
+    regex:
+      /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b|\bgh[pousr]_[A-Za-z0-9_]{20,}\b|\bxox[baprs]-[A-Za-z0-9-]{20,}\b/g,
+    confidence: 0.99,
+  },
+  {
+    type: "cloudResource",
+    regex: /\barn:(?:aws|azure|gcp):[^\s]+\b/gi,
+    confidence: 0.95,
+  },
+  {
+    type: "gitRemote",
+    regex: /\b(?:https?:\/\/[^\s/@]+(?::[^\s/@]+)?@github\.com\/[^\s]+|git@github\.com:[^\s]+)\b/gi,
+    confidence: 0.96,
+  },
+  {
+    type: "credentialUrl",
+    regex: /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp):\/\/[^\s]+/gi,
+    confidence: 0.98,
+  },
+  {
+    type: "path",
+    regex: /(?<![\w])(?:\/Users\/[^\s]+|\/home\/[^\s]+|[A-Z]:\\Users\\[^\s]+)/g,
+    confidence: 0.8,
+  },
+];
+
 function clean(value: string) {
   return value.replace(/[\s-]/g, "").toUpperCase();
 }
@@ -183,9 +242,12 @@ function validDate(value: string) {
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
-function collectContextCandidates(text: string): Candidate[] {
+function collectContextCandidates(
+  text: string,
+  rules: ContextPattern[] = contextPatterns,
+): Candidate[] {
   const candidates: Candidate[] = [];
-  for (const { type, regex, confidence } of contextPatterns) {
+  for (const { type, regex, confidence } of rules) {
     regex.lastIndex = 0;
     for (const match of text.matchAll(regex)) {
       const rawValue = match.groups?.value;
@@ -207,9 +269,12 @@ function collectContextCandidates(text: string): Candidate[] {
   return candidates;
 }
 
-function collectPatternCandidates(text: string): Candidate[] {
+function collectPatternCandidates(
+  text: string,
+  rules: Array<{ type: DetectionType; regex: RegExp; confidence: number }> = patterns,
+): Candidate[] {
   const candidates: Candidate[] = [];
-  for (const { type, regex, confidence } of patterns) {
+  for (const { type, regex, confidence } of rules) {
     regex.lastIndex = 0;
     for (const match of text.matchAll(regex)) {
       const value = match[0];
@@ -241,6 +306,27 @@ export function detect(text: string): Detection[] {
     ...candidate,
     id: `detection-${index + 1}`,
     decision: "pending",
+  }));
+}
+
+export function detectTerminal(text: string): Detection[] {
+  const baseCandidates = detect(text).map((item) => ({
+    start: item.start,
+    end: item.end,
+    value: item.value,
+    type: item.type,
+    confidence: item.confidence,
+    detector: item.detector,
+  }));
+  const candidates = [
+    ...baseCandidates,
+    ...collectContextCandidates(text, terminalContextPatterns),
+    ...collectPatternCandidates(text, terminalPatterns),
+  ];
+  return resolveOverlaps(candidates).map((candidate, index) => ({
+    ...candidate,
+    id: `terminal-detection-${index + 1}`,
+    decision: "pending" as const,
   }));
 }
 

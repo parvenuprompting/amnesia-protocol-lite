@@ -35,11 +35,12 @@ describe("synthetic generators", () => {
   });
 
   it("parses only supported markers and replaces them without touching other text", () => {
-    const text = "Mail EMAIL_1 naar CUSTOMER_2 op ADDRESS_3. Laat CODE_1 ongewijzigd.";
+    const text = "Mail EMAIL_1 naar CUSTOMER_2 op ADDRESS_3 met APIKEY_4. Laat CODE_1 ongewijzigd.";
     expect(parseSyntheticMarkers(text)).toEqual([
       { token: "EMAIL_1", type: "email" },
       { token: "CUSTOMER_2", type: "customer" },
       { token: "ADDRESS_3", type: "address" },
+      { token: "APIKEY_4", type: "apiKey" },
     ]);
     expect(
       replaceSyntheticMarkers(
@@ -48,9 +49,12 @@ describe("synthetic generators", () => {
           ["EMAIL_1", "mila@example.nl"],
           ["CUSTOMER_2", "847291503"],
           ["ADDRESS_3", "Lindelaan 42"],
+          ["APIKEY_4", "AKIA1234567890123456"],
         ]),
       ),
-    ).toBe("Mail mila@example.nl naar 847291503 op Lindelaan 42. Laat CODE_1 ongewijzigd.");
+    ).toBe(
+      "Mail mila@example.nl naar 847291503 op Lindelaan 42 met AKIA1234567890123456. Laat CODE_1 ongewijzigd.",
+    );
   });
 
   it("generates English values when the locale is selected", () => {

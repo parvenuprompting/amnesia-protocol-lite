@@ -13,7 +13,17 @@ export type DetectionType =
   | "reference"
   | "person"
   | "link"
-  | "other";
+  | "other"
+  | "apiKey"
+  | "accessToken"
+  | "jwt"
+  | "privateKey"
+  | "credentialUrl"
+  | "secret"
+  | "account"
+  | "path"
+  | "gitRemote"
+  | "cloudResource";
 
 export type Decision = "pending" | "accepted" | "rejected" | "edited";
 
@@ -44,4 +54,14 @@ export const TYPE_LABELS: Record<DetectionType, string> = {
   person: "Persoon",
   link: "Link",
   other: "Overig",
+  apiKey: "API-key",
+  accessToken: "Access token",
+  jwt: "JWT",
+  privateKey: "Private key",
+  credentialUrl: "Credential-URL",
+  secret: "Secret",
+  account: "Accountnaam",
+  path: "Pad",
+  gitRemote: "Git-remote",
+  cloudResource: "Cloud resource",
 };

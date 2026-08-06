@@ -23,6 +23,16 @@ const MARKER_TYPES: Record<string, DetectionType> = {
   PERSON: "person",
   LINK: "link",
   OTHER: "other",
+  APIKEY: "apiKey",
+  ACCESSTOKEN: "accessToken",
+  JWT: "jwt",
+  PRIVATEKEY: "privateKey",
+  CREDENTIALURL: "credentialUrl",
+  SECRET: "secret",
+  ACCOUNT: "account",
+  PATH: "path",
+  GITREMOTE: "gitRemote",
+  CLOUDRESOURCE: "cloudResource",
 };
 
 const FIRST_NAMES_NL = [
@@ -367,6 +377,35 @@ export function generateSyntheticValue(
       const path = rng.pick(locale === "en" ? LINK_PATHS_EN : LINK_PATHS);
       return `https://www.${domain}${path}`;
     }
+    case "apiKey":
+      return `AKIA${rng.chars(16)}`;
+    case "accessToken":
+      return `tok_${rng.chars(28).toLowerCase()}${rng.digits(4)}`;
+    case "jwt":
+      return `eyJ${rng.chars(18)}.${rng.chars(24)}.${rng.chars(32)}`;
+    case "privateKey":
+      return "-----BEGIN PRIVATE KEY-----\nSYNTHETIC-KEY-DATA\n-----END PRIVATE KEY-----";
+    case "credentialUrl":
+      return locale === "en"
+        ? "postgresql://fictional:demo-password@localhost:5432/example"
+        : "postgresql://fictief:demo-wachtwoord@localhost:5432/voorbeeld";
+    case "secret":
+      return `secret_${rng.chars(18).toLowerCase()}`;
+    case "account": {
+      const first = rng.pick(firstNames).toLowerCase();
+      const last = rng.pick(lastNames).toLowerCase().replace(/\s+/g, "-");
+      return `${first}.${last}`;
+    }
+    case "path": {
+      const account = generateSyntheticValue("account", value, rng, locale) ?? "synthetic-user";
+      return locale === "en" ? `/Users/${account}/project` : `/Users/${account}/project`;
+    }
+    case "gitRemote":
+      return locale === "en"
+        ? "git@github.com:example-org/demo-repo.git"
+        : "git@github.com:voorbeeld-org/demo-repo.git";
+    case "cloudResource":
+      return `arn:aws:s3:::synthetic-bucket-${rng.digits(6)}`;
     case "other":
       return null;
     default:

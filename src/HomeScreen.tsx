@@ -3,9 +3,10 @@ import { ShieldCheck, Sparkles } from "lucide-react";
 type HomeScreenProps = {
   onStart: () => void;
   onStartChat: () => void;
+  onStartTerminal: () => void;
 };
 
-export function HomeScreen({ onStart, onStartChat }: HomeScreenProps) {
+export function HomeScreen({ onStart, onStartChat, onStartTerminal }: HomeScreenProps) {
   return (
     <section className="home-screen">
       <div className="home-copy">
@@ -27,6 +28,9 @@ export function HomeScreen({ onStart, onStartChat }: HomeScreenProps) {
           </button>
           <button className="chat-start-button" type="button" onClick={onStartChat}>
             Start lokale chat <Sparkles size={16} />
+          </button>
+          <button className="terminal-start-button" type="button" onClick={onStartTerminal}>
+            Terminal <Sparkles size={16} />
           </button>
         </div>
       </div>
