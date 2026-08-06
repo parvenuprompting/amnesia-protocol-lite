@@ -1,11 +1,10 @@
 # Amnesia Protocol Lite
 
-[![Version](https://img.shields.io/badge/Version-v0.2.4-aa7651?style=flat-square)](#status)
+[![Version](https://img.shields.io/badge/Version-v0.2.5-aa7651?style=flat-square)](#status)
 [![Offline-first](https://img.shields.io/badge/Privacy-offline--first-637157?style=flat-square)](#privacy-en-beveiliging)
 [![Zero Cloud](https://img.shields.io/badge/Telemetry-Zero%20%2F%20No%20Tracking-2e532b?style=flat-square)](#privacy-en-beveiliging)
 [![Local AI](https://img.shields.io/badge/AI-local%20Ollama-c9a957?style=flat-square)](#synthetische-tweede-laag)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20Apple%20Silicon-252522?style=flat-square&logo=apple&logoColor=white)](#installeren)
-[![GitHub last commit](https://img.shields.io/github/last-commit/parvenuprompting/amnesia-protocol-lite?style=flat-square)](https://github.com/parvenuprompting/amnesia-protocol-lite/commits/main)
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=20232A)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
