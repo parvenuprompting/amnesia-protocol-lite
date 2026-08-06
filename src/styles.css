@@ -1121,6 +1121,31 @@ footer {
   align-items: center;
   justify-content: space-between;
 }
+.ollama-onboarding {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid #e0c7b9;
+  border-radius: 7px;
+  color: #74584d;
+  background: #fbefea;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.ollama-onboarding strong {
+  color: #8c4f47;
+}
+.ollama-onboarding p,
+.ollama-onboarding ol {
+  margin: 0;
+}
+.ollama-onboarding a {
+  color: #637157;
+  font-weight: 700;
+}
+.ollama-onboarding ol {
+  padding-left: 17px;
+}
 .settings-download-box {
   display: grid;
   gap: 9px;
