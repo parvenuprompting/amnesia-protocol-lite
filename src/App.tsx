@@ -1,71 +1,37 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Eraser, EyeOff, RotateCcw, RotateCw } from "lucide-react";
-import { copyAndVerify } from "./clipboard";
-import { detect } from "./detectors";
 import { AppDialog } from "./AppDialog";
-import { htmlToPlainText, insertTextAtSelection } from "./html";
-import { generateWithOllama } from "./ollama";
-import {
-  applyAction,
-  mergeDetections,
-  replaceAccepted,
-  type ReviewAction,
-  type ReviewSnapshot,
-} from "./review";
-import { ReviewBottomBar, type ClipboardStatus } from "./ReviewBottomBar";
-import { ReviewWorkspace } from "./ReviewWorkspace";
 import { HomeScreen } from "./HomeScreen";
+import { generateWithOllama } from "./ollama";
+import { ReviewBottomBar } from "./ReviewBottomBar";
+import { ReviewWorkspace } from "./ReviewWorkspace";
 import { SyntheticPanel, type SyntheticEntry } from "./SyntheticPanel";
-import { createSyntheticMap, parseSyntheticMarkers, replaceSyntheticMarkers } from "./synthetic";
-import type { Detection, DetectionType } from "./types";
-import { TYPE_LABELS } from "./types";
+import {
+  createSyntheticMap,
+  parseSyntheticMarkers,
+  replaceSyntheticMarkers,
+  type SyntheticLocale,
+} from "./synthetic";
 import { useDialog } from "./useDialog";
+import { useClipboard } from "./useClipboard";
+import { reviewTypeOptions, useReviewState } from "./useReviewState";
 
 const initialText =
   "Plak hier de tekst die je wilt controleren. Bijvoorbeeld: klantnummer 123456 of e-mail klant@example.com.";
-const typeOptions = Object.entries(TYPE_LABELS) as [DetectionType, string][];
-
-function tokenFor(type: DetectionType, index: number) {
-  return `${type.toUpperCase()}_${index}`;
-}
-
-function createTokens(items: Detection[]) {
-  const counts = new Map<DetectionType, number>();
-  const mapping = new Map<string, string>();
-  items
-    .filter((item) => item.decision === "accepted" || item.decision === "edited")
-    .forEach((item) => {
-      if (!mapping.has(item.value)) {
-        const index = (counts.get(item.type) ?? 0) + 1;
-        counts.set(item.type, index);
-        mapping.set(item.value, tokenFor(item.type, index));
-      }
-    });
-  return mapping;
-}
 
 function App() {
   const [screen, setScreen] = useState<"home" | "review" | "synthetic">("home");
-  const [text, setText] = useState(initialText);
-  const [detections, setDetections] = useState<Detection[]>(() => detect(initialText));
-  const [history, setHistory] = useState<ReviewSnapshot[]>([]);
-  const [future, setFuture] = useState<ReviewSnapshot[]>([]);
-  const [textEditBaseline, setTextEditBaseline] = useState<ReviewSnapshot | null>(null);
-  const [filter, setFilter] = useState("all");
   const [message, setMessage] = useState("Klaar voor beoordeling");
-  const [selectedType, setSelectedType] = useState<DetectionType>("person");
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [toastKey, setToastKey] = useState(0);
-  const [clipboardStatus, setClipboardStatus] = useState<ClipboardStatus>({ state: "idle" });
   const [syntheticInput, setSyntheticInput] = useState("");
   const [syntheticValues, setSyntheticValues] = useState<Map<string, string>>(new Map());
   const [ollamaModel, setOllamaModel] = useState("llama3.2");
   const [otherFormatHint, setOtherFormatHint] = useState("");
+  const [syntheticLocale, setSyntheticLocale] = useState<SyntheticLocale>("nl");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState("");
   const [sessionSeed] = useState(() => Date.now());
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const textEditVersionRef = useRef(0);
   const { dialog, askConfirm, askPrompt } = useDialog();
 
   const showToast = (msg: string) => {
@@ -74,128 +40,18 @@ function App() {
     setFeedbackVisible(true);
   };
 
+  const review = useReviewState({
+    initialText,
+    onToast: showToast,
+    askConfirm,
+  });
+  const clipboard = useClipboard(showToast);
+
   useEffect(() => {
     if (!feedbackVisible) return;
     const timeout = window.setTimeout(() => setFeedbackVisible(false), 2400);
     return () => window.clearTimeout(timeout);
   }, [feedbackVisible, toastKey]);
-
-  useEffect(() => {
-    if (!textEditBaseline) return;
-    const version = textEditVersionRef.current;
-    const timeout = window.setTimeout(() => {
-      if (version !== textEditVersionRef.current) return;
-      setHistory((items) => [...items, textEditBaseline]);
-      setFuture([]);
-      setDetections(mergeDetections(textEditBaseline.detections, detect(text), text));
-      setTextEditBaseline(null);
-      showToast("Nieuwe tekst gedetecteerd");
-    }, 200);
-    return () => window.clearTimeout(timeout);
-  }, [text, textEditBaseline]);
-
-  const freshDetections = () =>
-    textEditBaseline
-      ? mergeDetections(textEditBaseline.detections, detect(text), text)
-      : detections;
-
-  const commitDetections = (next: Detection[]) => {
-    textEditVersionRef.current += 1;
-    setHistory((items) => [...items, textEditBaseline ?? { text, detections }]);
-    setFuture([]);
-    setTextEditBaseline(null);
-    setDetections(next);
-  };
-
-  const update = (action: ReviewAction) => {
-    commitDetections(applyAction(freshDetections(), action));
-  };
-
-  const onTextChange = (value: string) => {
-    textEditVersionRef.current += 1;
-    if (!textEditBaseline) setTextEditBaseline({ text, detections });
-    setText(value);
-    setDetections([]);
-    setFuture([]);
-  };
-
-  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    event.preventDefault();
-    const input = event.currentTarget;
-    const start = input.selectionStart ?? 0;
-    const end = input.selectionEnd ?? 0;
-    const html = event.clipboardData.getData("text/html");
-    const plain = event.clipboardData.getData("text/plain");
-    const pasted = html ? htmlToPlainText(html) : plain;
-    if (!pasted) return;
-    onTextChange(insertTextAtSelection(text, pasted, start, end));
-  };
-
-  const addManual = () => {
-    const editor = textareaRef.current;
-    if (!editor || editor.selectionStart === editor.selectionEnd) {
-      showToast("Selecteer eerst tekst in het invoerveld");
-      return;
-    }
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const manual: Detection = {
-      id: `manual-${Date.now()}`,
-      start,
-      end,
-      value: text.slice(start, end),
-      type: selectedType,
-      confidence: 1,
-      detector: "manual",
-      decision: "pending",
-    };
-    const current = freshDetections();
-    commitDetections([...current, manual].sort((a, b) => a.start - b.start));
-    showToast("Handmatige markering toegevoegd");
-  };
-
-  const undo = () => {
-    if (textEditBaseline) {
-      textEditVersionRef.current += 1;
-      setText(textEditBaseline.text);
-      setDetections(textEditBaseline.detections);
-      setTextEditBaseline(null);
-      showToast("Tekstwijziging ongedaan gemaakt");
-      return;
-    }
-    const previous = history.at(-1);
-    if (!previous) return;
-    setFuture((items) => [...items, { text, detections }]);
-    setText(previous.text);
-    setDetections(previous.detections);
-    setTextEditBaseline(null);
-    setHistory((items) => items.slice(0, -1));
-    showToast("Actie ongedaan gemaakt");
-  };
-
-  const redo = () => {
-    const next = future.at(-1);
-    if (!next) return;
-    setHistory((items) => [...items, { text, detections }]);
-    setText(next.text);
-    setDetections(next.detections);
-    setTextEditBaseline(null);
-    setFuture((items) => items.slice(0, -1));
-    showToast("Actie opnieuw toegepast");
-  };
-
-  const tokens = useMemo(() => createTokens(detections), [detections]);
-  const pending = detections.filter((item) => item.decision === "pending").length;
-  const filtered = detections.filter(
-    (item) =>
-      filter === "all" ||
-      item.decision === filter ||
-      item.type === filter ||
-      (filter === "low" && item.confidence < 0.7),
-  );
-  const acceptedCount = detections.filter(
-    (item) => item.decision === "accepted" || item.decision === "edited",
-  ).length;
 
   const syntheticMarkers = useMemo(() => parseSyntheticMarkers(syntheticInput), [syntheticInput]);
   const syntheticEntries = useMemo<SyntheticEntry[]>(
@@ -212,73 +68,20 @@ function App() {
   const syntheticOutput = replaceSyntheticMarkers(syntheticInput, syntheticValues);
 
   const copyOutput = async () => {
-    const currentDetections = freshDetections();
-    if (textEditBaseline) commitDetections(currentDetections);
-    const currentPending = currentDetections.filter((item) => item.decision === "pending").length;
+    const { detections, output } = review.prepareOutput();
+    const pending = detections.filter((item) => item.decision === "pending").length;
     if (
-      currentPending > 0 &&
+      pending > 0 &&
       !(await askConfirm(
-        `${currentPending} kandidaat${currentPending === 1 ? " is" : "en zijn"} nog niet beoordeeld. Toch kopiëren?`,
+        `${pending} kandidaat${pending === 1 ? " is" : "en zijn"} nog niet beoordeeld. Toch kopiëren?`,
         "Onbeoordeelde kandidaten",
       ))
     )
       return;
-    setClipboardStatus({ state: "copying" });
-    try {
-      const currentTokens = createTokens(currentDetections);
-      await copyAndVerify(replaceAccepted(text, currentDetections, currentTokens));
-      const count = currentDetections.filter(
-        (item) => item.decision === "accepted" || item.decision === "edited",
-      ).length;
-      const successMessage = `${count} markeringen gekopieerd`;
-      setClipboardStatus({ state: "success", message: successMessage });
-      showToast(successMessage);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "onbekende clipboardfout";
-      setClipboardStatus({ state: "error", message: "Kopiëren mislukt" });
-      console.error("Clipboard copy failed:", errorMessage);
-      showToast("Kopiëren is niet gelukt");
-    }
-  };
-
-  const acceptPending = async () => {
-    const current = freshDetections();
-    const open = current.filter((item) => item.decision === "pending");
-    if (!open.length) {
-      showToast("Geen openstaande kandidaten");
-      return;
-    }
-    if (
-      open.length >= 10 &&
-      !(await askConfirm(
-        `Dit accepteert ${open.length} openstaande kandidaten. Doorgaan?`,
-        "Openstaande kandidaten accepteren",
-      ))
-    )
-      return;
-    commitDetections(
-      current.map((item) =>
-        item.decision === "pending" ? { ...item, decision: "accepted" as const } : item,
-      ),
-    );
-    showToast(`${open.length} openstaande kandidaten geaccepteerd`);
-  };
-
-  const forceAll = async () => {
-    const current = freshDetections();
-    if (!current.length) {
-      showToast("Geen kandidaten om te accepteren");
-      return;
-    }
-    if (
-      !(await askConfirm(
-        "Dit overschrijft ook genegeerde kandidaten. Weet je het zeker?",
-        "Forceer alle kandidaten",
-      ))
-    )
-      return;
-    commitDetections(current.map((item) => ({ ...item, decision: "accepted" as const })));
-    showToast(`${current.length} kandidaten geaccepteerd`);
+    const count = detections.filter(
+      (item) => item.decision === "accepted" || item.decision === "edited",
+    ).length;
+    await clipboard.copy(output, `${count} markeringen gekopieerd`);
   };
 
   const generateStandardReplacements = () => {
@@ -289,6 +92,7 @@ function App() {
     const generated = createSyntheticMap(
       syntheticMarkers.map((marker) => ({ type: marker.type, value: marker.token })),
       sessionSeed,
+      syntheticLocale,
     );
     setSyntheticValues((current) => new Map([...current, ...generated]));
     showToast(`${generated.size} standaardvervanger${generated.size === 1 ? "" : "s"} gegenereerd`);
@@ -306,6 +110,8 @@ function App() {
         entry.token,
         otherFormatHint,
         ollamaModel.trim(),
+        undefined,
+        syntheticLocale,
       );
       setSyntheticValues((current) => new Map(current).set(entry.token, replacement));
     } catch (error) {
@@ -327,18 +133,10 @@ function App() {
       showToast("Genereer eerst alle vervangers voordat je kopieert");
       return;
     }
-    setClipboardStatus({ state: "copying" });
-    try {
-      await copyAndVerify(syntheticOutput);
-      const successMessage = `${syntheticEntries.length} synthetische vervangers gekopieerd`;
-      setClipboardStatus({ state: "success", message: successMessage });
-      showToast(successMessage);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "onbekende clipboardfout";
-      setClipboardStatus({ state: "error", message: "Kopiëren mislukt" });
-      console.error("Synthetic clipboard copy failed:", errorMessage);
-      showToast("Kopiëren is niet gelukt");
-    }
+    await clipboard.copy(
+      syntheticOutput,
+      `${syntheticEntries.length} synthetische vervangers gekopieerd`,
+    );
   };
 
   return (
@@ -359,16 +157,16 @@ function App() {
         <div className="top-actions">
           <button
             className="icon-button"
-            onClick={undo}
-            disabled={!history.length}
+            onClick={review.undo}
+            disabled={!review.history.length}
             aria-label="Undo"
           >
             <RotateCcw size={17} />
           </button>
           <button
             className="icon-button"
-            onClick={redo}
-            disabled={!future.length}
+            onClick={review.redo}
+            disabled={!review.future.length}
             aria-label="Redo"
           >
             <RotateCw size={17} />
@@ -393,7 +191,7 @@ function App() {
               type="button"
               className={screen === "synthetic" ? "active" : ""}
               onClick={() => setScreen("synthetic")}
-              disabled={!acceptedCount}
+              disabled={!review.acceptedCount}
             >
               02 Synthetisch
             </button>
@@ -401,35 +199,35 @@ function App() {
           {screen === "review" ? (
             <>
               <ReviewWorkspace
-                text={text}
-                detections={detections}
-                filtered={filtered}
-                tokens={tokens}
-                filter={filter}
-                pending={pending}
-                selectedType={selectedType}
-                textareaRef={textareaRef}
-                onTextChange={onTextChange}
-                onPaste={handlePaste}
+                text={review.text}
+                detections={review.detections}
+                filtered={review.filtered}
+                tokens={review.tokens}
+                filter={review.filter}
+                pending={review.pending}
+                selectedType={review.selectedType}
+                textareaRef={review.textareaRef}
+                onTextChange={review.onTextChange}
+                onPaste={review.handlePaste}
                 onScroll={(event) => {
                   const layer = event.currentTarget.previousElementSibling as HTMLElement;
                   layer.scrollTop = event.currentTarget.scrollTop;
                   layer.scrollLeft = event.currentTarget.scrollLeft;
                 }}
-                onFilterChange={setFilter}
-                onAddManual={addManual}
-                onUpdate={update}
+                onFilterChange={review.setFilter}
+                onAddManual={review.addManual}
+                onUpdate={review.update}
                 onPrompt={askPrompt}
                 onToast={showToast}
               />
               <ReviewBottomBar
-                typeOptions={typeOptions}
-                selectedType={selectedType}
-                acceptedCount={acceptedCount}
-                clipboardStatus={clipboardStatus}
-                onTypeChange={setSelectedType}
-                onAcceptPending={() => void acceptPending()}
-                onForceAll={() => void forceAll()}
+                typeOptions={reviewTypeOptions}
+                selectedType={review.selectedType}
+                acceptedCount={review.acceptedCount}
+                clipboardStatus={clipboard.status}
+                onTypeChange={review.setSelectedType}
+                onAcceptPending={() => void review.acceptPending()}
+                onForceAll={() => void review.forceAll()}
                 onCopy={() => void copyOutput()}
               />
             </>
@@ -439,6 +237,7 @@ function App() {
               sourceText={syntheticInput}
               syntheticText={syntheticOutput}
               model={ollamaModel}
+              locale={syntheticLocale}
               formatHint={otherFormatHint}
               aiBusy={aiBusy}
               aiError={aiError}
@@ -447,6 +246,7 @@ function App() {
                 setAiError("");
               }}
               onModelChange={setOllamaModel}
+              onLocaleChange={setSyntheticLocale}
               onFormatHintChange={setOtherFormatHint}
               onGenerateAll={generateStandardReplacements}
               onGenerateOther={(entry) => void generateOther(entry)}

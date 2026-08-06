@@ -836,6 +836,7 @@ footer {
   text-transform: uppercase;
 }
 .synthetic-controls input,
+.synthetic-controls select,
 .synthetic-replacement-row input {
   width: 100%;
   min-width: 0;
@@ -848,6 +849,7 @@ footer {
   outline: 0;
 }
 .synthetic-controls input:focus,
+.synthetic-controls select:focus,
 .synthetic-replacement-row input:focus {
   border-color: #8d9a7c;
   box-shadow: 0 0 0 2px #dfe9d6;

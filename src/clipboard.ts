@@ -8,6 +8,12 @@ export type ClipboardApi = {
   readText: () => Promise<string>;
 };
 
+export type ClipboardStatus =
+  | { state: "idle" }
+  | { state: "copying" }
+  | { state: "success"; message: string }
+  | { state: "error"; message: string };
+
 export function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }

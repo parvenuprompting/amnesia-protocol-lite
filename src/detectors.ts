@@ -183,7 +183,7 @@ function validDate(value: string) {
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
-export function detect(text: string): Detection[] {
+function collectContextCandidates(text: string): Candidate[] {
   const candidates: Candidate[] = [];
   for (const { type, regex, confidence } of contextPatterns) {
     regex.lastIndex = 0;
@@ -204,6 +204,11 @@ export function detect(text: string): Detection[] {
       });
     }
   }
+  return candidates;
+}
+
+function collectPatternCandidates(text: string): Candidate[] {
+  const candidates: Candidate[] = [];
   for (const { type, regex, confidence } of patterns) {
     regex.lastIndex = 0;
     for (const match of text.matchAll(regex)) {
@@ -227,6 +232,11 @@ export function detect(text: string): Detection[] {
       });
     }
   }
+  return candidates;
+}
+
+export function detect(text: string): Detection[] {
+  const candidates = [...collectContextCandidates(text), ...collectPatternCandidates(text)];
   return resolveOverlaps(candidates).map((candidate, index) => ({
     ...candidate,
     id: `detection-${index + 1}`,
