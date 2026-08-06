@@ -2,8 +2,8 @@ import { Download, RefreshCw, X } from "lucide-react";
 import { CLIPBOARD_CLEAR_OPTIONS, type ClipboardClearDelay } from "./clipboard";
 import {
   FALLBACK_OLLAMA_MODEL,
+  hasMistralModel,
   OLLAMA_CATALOG,
-  PRIMARY_OLLAMA_MODEL,
   type OllamaLocalModel,
 } from "./ollama";
 import type { SyntheticLocale } from "./synthetic";
@@ -68,16 +68,8 @@ export function SettingsPanel({
           <h3>Lokale AI</h3>
           <div className="settings-model-status">
             <span>Mistral</span>
-            <strong
-              className={
-                localModels.some((model) => model.name === PRIMARY_OLLAMA_MODEL)
-                  ? "available"
-                  : "missing"
-              }
-            >
-              {localModels.some((model) => model.name === PRIMARY_OLLAMA_MODEL)
-                ? "Lokaal beschikbaar"
-                : "Ontbreekt"}
+            <strong className={hasMistralModel(localModels) ? "available" : "missing"}>
+              {hasMistralModel(localModels) ? "Lokaal beschikbaar" : "Ontbreekt"}
             </strong>
             <span>Gemma 3 1B fallback</span>
             <strong

@@ -43,6 +43,11 @@ export type OllamaCatalogModel = {
 
 export const PRIMARY_OLLAMA_MODEL = "mistral:latest";
 export const FALLBACK_OLLAMA_MODEL = "gemma3:1b";
+export const MISTRAL_MODEL_ALIASES = [
+  "mistral:latest",
+  "mistral",
+  "dolphin-mistral:latest",
+] as const;
 
 export const OLLAMA_CATALOG: OllamaCatalogModel[] = [
   {
@@ -62,10 +67,24 @@ export const OLLAMA_CATALOG: OllamaCatalogModel[] = [
 ];
 
 export function resolveOllamaModel(models: OllamaLocalModel[]) {
-  const primary = models.find((model) => model.name === PRIMARY_OLLAMA_MODEL);
-  if (primary) return { ...primary, fallback: false };
+  const primary = models.find((model) =>
+    MISTRAL_MODEL_ALIASES.includes(model.name as (typeof MISTRAL_MODEL_ALIASES)[number]),
+  );
+  if (primary) {
+    return {
+      ...primary,
+      fallback: false,
+      label: primary.name === "dolphin-mistral:latest" ? "Dolphin Mistral" : "Mistral",
+    };
+  }
   const fallback = models.find((model) => model.name === FALLBACK_OLLAMA_MODEL);
-  return fallback ? { ...fallback, fallback: true } : null;
+  return fallback ? { ...fallback, fallback: true, label: "Gemma 3 1B" } : null;
+}
+
+export function hasMistralModel(models: OllamaLocalModel[]) {
+  return models.some((model) =>
+    MISTRAL_MODEL_ALIASES.includes(model.name as (typeof MISTRAL_MODEL_ALIASES)[number]),
+  );
 }
 
 export async function generateWithOllama(

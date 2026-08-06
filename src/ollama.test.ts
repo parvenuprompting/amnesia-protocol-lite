@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chatWithOllama, generateWithOllama, listOllamaModels, pullOllamaModel } from "./ollama";
+import {
+  chatWithOllama,
+  generateWithOllama,
+  listOllamaModels,
+  pullOllamaModel,
+  resolveOllamaModel,
+} from "./ollama";
 
 describe("generateWithOllama", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -109,5 +115,23 @@ describe("generateWithOllama", () => {
         numPredict: 512,
       }),
     ).rejects.toThrow("model 'llama3.2' not found");
+  });
+
+  it("accepts Dolphin Mistral as a primary Mistral-family model", () => {
+    expect(
+      resolveOllamaModel([{ name: "dolphin-mistral:latest", parameterSize: "7B" }]),
+    ).toMatchObject({
+      name: "dolphin-mistral:latest",
+      fallback: false,
+      label: "Dolphin Mistral",
+    });
+  });
+
+  it("uses Gemma 3 1B only when no Mistral-family model is installed", () => {
+    expect(resolveOllamaModel([{ name: "gemma3:1b", parameterSize: "1B" }])).toMatchObject({
+      name: "gemma3:1b",
+      fallback: true,
+      label: "Gemma 3 1B",
+    });
   });
 });

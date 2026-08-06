@@ -180,9 +180,14 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if ((!settingsOpen && screen !== "chat") || ollamaStatus !== "idle") return;
+    if (!settingsOpen) return;
     void refreshModels();
-  }, [ollamaStatus, refreshModels, screen, settingsOpen]);
+  }, [refreshModels, settingsOpen]);
+
+  useEffect(() => {
+    if (screen !== "chat" || ollamaStatus !== "idle") return;
+    void refreshModels();
+  }, [ollamaStatus, refreshModels, screen]);
 
   const pullModel = async () => {
     const selected = OLLAMA_CATALOG.find((item) => item.name === downloadModel);
