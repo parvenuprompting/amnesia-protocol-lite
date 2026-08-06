@@ -74,6 +74,13 @@ describe("detectors", () => {
       ["serial", "SN8844"],
     ]);
   });
+  it("detects full URLs as link type", () => {
+    const result = detect("Bekijk https://example.com/path en http://test.org.");
+    expect(result.map((item) => [item.type, item.value])).toEqual([
+      ["link", "https://example.com/path"],
+      ["link", "http://test.org"],
+    ]);
+  });
   it("detects all sensitive entities in Dutch customer service document", () => {
     const doc = [
       "afzender Voorbeeld B.V.",
@@ -81,7 +88,7 @@ describe("detectors", () => {
       "adres Dorpsstraat 42",
       "1012 AB Amsterdam",
       "telefoon 020 123 4567",
-      "internet voorbeeld.nl",
+      "internet https://voorbeeld.nl",
       "IBAN NL91 ABNA 0417 1643 00",
       "BTW nr NL123456789B01",
       "KvK nr 12.345.678",
@@ -104,7 +111,7 @@ describe("detectors", () => {
       ["postcode", "Dorpsstraat 42"],
       ["postcode", "1012 AB Amsterdam"],
       ["phone", "020 123 4567"],
-      ["email", "voorbeeld.nl"],
+      ["link", "https://voorbeeld.nl"],
       ["iban", "NL91 ABNA 0417 1643 00"],
       ["reference", "NL123456789B01"],
       ["reference", "12.345.678"],

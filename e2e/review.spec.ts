@@ -56,3 +56,46 @@ test("werkt verder zonder netwerkverbinding", async ({ page, context }) => {
   await page.getByRole("textbox", { name: "Brontekst" }).fill("offline@example.com");
   await expect(page.getByRole("complementary").getByText("E-mail", { exact: true })).toBeVisible();
 });
+
+test("plakt HTML met lege regels en ondersteunt handmatige Overig-markering", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Start een nieuwe controle/ }).click();
+  const editor = page.getByRole("textbox", { name: "Brontekst" });
+  await editor.fill("");
+  await editor.evaluate((element, html) => {
+    const input = element as HTMLTextAreaElement;
+    const dataTransfer = new DataTransfer();
+    dataTransfer.setData("text/html", html);
+    dataTransfer.setData("text/plain", "Regel 1 Regel 2");
+    input.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: dataTransfer,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  }, "<p>Regel 1</p><p>Regel 2</p>");
+  await expect(editor).toHaveValue("Regel 1\n\nRegel 2");
+  await editor.evaluate((element) => {
+    const input = element as HTMLTextAreaElement;
+    input.setSelectionRange(0, 6);
+  });
+  await page.getByLabel("Type handmatig label").selectOption("other");
+  await page.getByRole("button", { name: /Markering toevoegen/ }).click();
+  await expect(page.getByRole("complementary").getByText("Overig", { exact: true })).toBeVisible();
+});
+
+test("genereert een tweede lokale synthetische laag", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Start een nieuwe controle/ }).click();
+  const editor = page.getByRole("textbox", { name: "Brontekst" });
+  await editor.fill("Stuur dit naar klant@example.com.");
+  await page.locator(".candidate").getByRole("button", { name: "Genereer token" }).click();
+  await page.getByRole("button", { name: "02 Synthetisch" }).click();
+
+  const syntheticText = page.getByRole("textbox", { name: "Synthetische tekst" });
+  await expect(syntheticText).not.toHaveValue("Stuur dit naar klant@example.com.");
+  await expect(syntheticText).toHaveValue(/@/);
+  await expect(page.getByText("Fictieve vervangers", { exact: false })).toBeVisible();
+  await expect(page.getByText("EMAIL_1", { exact: true })).toBeVisible();
+});

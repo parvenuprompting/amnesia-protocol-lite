@@ -65,6 +65,11 @@ const patterns: Array<{ type: DetectionType; regex: RegExp; confidence: number }
     regex: /\b\d{2}\.\d{3}\.\d{3}\b/g,
     confidence: 0.9,
   },
+  {
+    type: "link",
+    regex: /\bhttps?:\/\/[^\s<>"{}|\\^`]+(?<![.,;!?:)])/gi,
+    confidence: 0.96,
+  },
 ];
 
 const contextPatterns: ContextPattern[] = [
@@ -111,9 +116,9 @@ const contextPatterns: ContextPattern[] = [
     confidence: 0.98,
   },
   {
-    type: "email",
+    type: "link",
     regex:
-      /\b(?:internet|website|web|url|site)\s*[:#-]?\s*(?<value>(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+)\b/gi,
+      /\b(?:internet|website|web|url|site)\s*[:#-]?\s*(?<value>https?:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[^\s]*)?)\b/gi,
     confidence: 0.95,
   },
   {

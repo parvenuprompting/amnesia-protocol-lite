@@ -10,7 +10,9 @@ export type DetectionType =
   | "transaction"
   | "serial"
   | "reference"
-  | "person";
+  | "person"
+  | "link"
+  | "other";
 
 export type Decision = "pending" | "accepted" | "rejected" | "edited";
 
@@ -38,4 +40,6 @@ export const TYPE_LABELS: Record<DetectionType, string> = {
   serial: "Serienummer",
   reference: "Referentie",
   person: "Persoon",
+  link: "Link",
+  other: "Overig",
 };
