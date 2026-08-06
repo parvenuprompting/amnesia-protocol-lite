@@ -26,9 +26,10 @@ De app is bedoeld voor persoonlijk gebruik op één Mac. Het doel is gecontrolee
 3. Bekijk de automatisch gevonden kandidaten.
 4. Kies per kandidaat `Genereer token`, `Negeren` of `Waarde aanpassen`.
 5. Voeg gemiste passages handmatig toe met de `+`-knop.
-6. Kopieer de gereviewde tekst, of gebruik `Alles vervangen & kopiëren` na de expliciete bevestiging.
+6. Gebruik eventueel `Alles vervangen` na de expliciete bevestiging.
+7. Controleer de vervangingen en klik daarna op `Kopieer veilige tekst`.
 
-De bulkactie vervangt alle geflagde kandidaten in één keer, inclusief eerder genegeerde kandidaten. Gebruik die actie alleen wanneer dat bewust gewenst is.
+De bulkactie vervangt alle geflagde kandidaten in één keer, inclusief eerder genegeerde kandidaten, maar kopieert niets automatisch. Gebruik die actie alleen wanneer dat bewust gewenst is en controleer daarna de tekst voordat je op `Kopieer veilige tekst` klikt.
 
 ## Detectie
 

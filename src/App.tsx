@@ -180,35 +180,25 @@ function App() {
     }
   };
 
-  const replaceAllAndCopy = async () => {
+  const replaceAll = () => {
     if (!detections.length) {
+      setClipboardStatus({ state: "error", message: "Geen kandidaten om te vervangen" });
       setMessage("Geen kandidaten om te vervangen");
       return;
     }
     if (
       !window.confirm(
-        `Dit vervangt alle ${detections.length} geflagde items en kopieert de tekst naar het klembord. Doorgaan?`,
+        `Dit vervangt alle ${detections.length} geflagde items. Je kunt daarna zelf de tekst kopiëren. Doorgaan?`,
       )
     )
       return;
-    setClipboardStatus({ state: "copying" });
     const allAccepted = detections.map((item) => ({ ...item, decision: "accepted" as const }));
-    const allTokens = createTokens(allAccepted);
-    const allOutput = replaceAccepted(text, allAccepted, allTokens);
-    try {
-      await copyAndVerify(allOutput);
-      setHistory((items) => [...items, detections]);
-      setFuture([]);
-      setDetections(allAccepted);
-      const successMessage = `${detections.length} items vervangen en gekopieerd`;
-      setClipboardStatus({ state: "success", message: successMessage });
-      setMessage(successMessage);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "onbekende clipboardfout";
-      setClipboardStatus({ state: "error", message: "Kopiëren mislukt" });
-      console.error("Bulk clipboard copy failed:", errorMessage);
-      setMessage("Kopiëren is niet gelukt");
-    }
+    setHistory((items) => [...items, detections]);
+    setFuture([]);
+    setDetections(allAccepted);
+    const successMessage = `${detections.length} items vervangen. Controleer de tekst en klik daarna op Kopieer veilige tekst.`;
+    setClipboardStatus({ state: "success", message: successMessage });
+    setMessage(successMessage);
   };
 
   return (
@@ -465,6 +455,16 @@ function App() {
               {clipboardStatus.state === "error" && clipboardStatus.message}
             </div>
             <button
+              className="bulk-copy-button"
+              type="button"
+              onClick={replaceAll}
+              disabled={clipboardStatus.state === "copying"}
+              data-testid="replace-all"
+              title="Vervang alle geflagde items zonder ze te kopiëren"
+            >
+              <Sparkles size={16} /> Alles vervangen
+            </button>
+            <button
               className="copy-button"
               type="button"
               onClick={copyOutput}
@@ -472,17 +472,6 @@ function App() {
             >
               <Clipboard size={17} />{" "}
               {clipboardStatus.state === "copying" ? "Kopiëren..." : "Kopieer veilige tekst"}
-            </button>
-            <button
-              className="bulk-copy-button"
-              type="button"
-              onClick={replaceAllAndCopy}
-              disabled={clipboardStatus.state === "copying"}
-              data-testid="replace-all-copy"
-              title="Vervang alle geflagde items en kopieer de tekst"
-            >
-              <Sparkles size={16} />{" "}
-              {clipboardStatus.state === "copying" ? "Bezig..." : "Alles vervangen & kopiëren"}
             </button>
           </section>
         </>
