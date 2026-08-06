@@ -12,19 +12,20 @@ test("plakken, reviewen, handmatig markeren en undo", async ({ page }) => {
   await expect(
     page.getByRole("complementary").getByText("Klantnummer", { exact: true }),
   ).toBeVisible();
-  const candidates = page.locator(".candidate");
-  await candidates.nth(0).getByRole("button", { name: "Genereer token" }).click();
-  await candidates.nth(1).getByRole("button", { name: "Negeren" }).click();
-  await expect(candidates.nth(0)).toHaveClass(/accepted/);
-  await expect(candidates.nth(0).getByText("EMAIL_1", { exact: true })).toBeVisible();
-  await expect(candidates.nth(1)).toHaveClass(/rejected/);
+  const emailCandidate = page.locator(".candidate").filter({ hasText: "klant@example.com" });
+  const customerCandidate = page.locator(".candidate").filter({ hasText: "123456" });
+  await emailCandidate.getByRole("button", { name: "Genereer token" }).click();
+  await expect(emailCandidate).toHaveClass(/accepted/);
+  await expect(emailCandidate.getByText("EMAIL_1", { exact: true })).toBeVisible();
+  await customerCandidate.getByRole("button", { name: "Negeren" }).click();
+  await expect(customerCandidate).toHaveClass(/rejected/);
   await page.getByRole("button", { name: "Kopieer veilige tekst" }).click();
   await expect(page.getByTestId("clipboard-status")).toHaveText(/markeringen gekopieerd/);
   await expect(page.evaluate(() => navigator.clipboard.readText())).resolves.toContain("EMAIL_1");
   await editor.fill("Mail klant@example.com voor klantnummer 123456 aangepast.");
-  await expect(candidates.nth(0)).toHaveClass(/accepted/);
-  await expect(candidates.nth(1)).toHaveClass(/rejected/);
-  await candidates.nth(1).getByRole("button", { name: "Waarde aanpassen" }).click();
+  await expect(emailCandidate).toHaveClass(/accepted/);
+  await expect(customerCandidate).toHaveClass(/rejected/);
+  await customerCandidate.getByRole("button", { name: "Waarde aanpassen" }).click();
   await page.getByTestId("modal-input").fill("dossier 123456");
   await page.getByTestId("modal-ok").click();
   await editor.evaluate((element) => {
@@ -35,9 +36,9 @@ test("plakken, reviewen, handmatig markeren en undo", async ({ page }) => {
   await expect(page.getByRole("status")).toHaveText("Handmatige markering toegevoegd");
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByRole("status")).toHaveText("Actie ongedaan gemaakt");
-  await page.getByTestId("replace-all").click();
+  await page.getByTestId("force-all").click();
   await page.getByTestId("modal-ok").click();
-  await expect(page.getByRole("status")).toHaveText(/items vervangen\. Controleer de tekst/);
+  await expect(page.getByRole("status")).toHaveText(/kandidaten geaccepteerd/);
   await expect(page.evaluate(() => navigator.clipboard.readText())).resolves.not.toContain(
     "CUSTOMER_1",
   );
@@ -55,6 +56,30 @@ test("werkt verder zonder netwerkverbinding", async ({ page, context }) => {
   await context.setOffline(true);
   await page.getByRole("textbox", { name: "Brontekst" }).fill("offline@example.com");
   await expect(page.getByRole("complementary").getByText("E-mail", { exact: true })).toBeVisible();
+});
+
+test("accepteert alleen openstaande kandidaten", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Start een nieuwe controle/ }).click();
+  await page
+    .getByRole("textbox", { name: "Brontekst" })
+    .fill("Mail klant@example.com voor klantnummer 123456.");
+  const candidates = page.locator(".candidate");
+  await candidates.nth(0).getByRole("button", { name: "Negeren" }).click();
+  await page.getByTestId("accept-pending").click();
+  await expect(candidates.nth(0)).toHaveClass(/rejected/);
+  await expect(candidates.nth(1)).toHaveClass(/accepted/);
+});
+
+test("undo herstelt tekst en detecties samen", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Start een nieuwe controle/ }).click();
+  const editor = page.getByRole("textbox", { name: "Brontekst" });
+  await editor.fill("Eerste klant@example.com");
+  await expect(page.getByRole("complementary").getByText("E-mail", { exact: true })).toBeVisible();
+  await editor.fill("Tweede andere@example.com");
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(editor).toHaveValue("Eerste klant@example.com");
 });
 
 test("plakt HTML met lege regels en ondersteunt handmatige Overig-markering", async ({ page }) => {
@@ -90,8 +115,12 @@ test("genereert een tweede lokale synthetische laag", async ({ page }) => {
   await page.getByRole("button", { name: /Start een nieuwe controle/ }).click();
   const editor = page.getByRole("textbox", { name: "Brontekst" });
   await editor.fill("Stuur dit naar klant@example.com.");
-  await page.locator(".candidate").getByRole("button", { name: "Genereer token" }).click();
+  const candidate = page.locator(".candidate").filter({ hasText: "klant@example.com" });
+  await candidate.getByRole("button", { name: "Genereer token" }).click();
+  await expect(candidate).toHaveClass(/accepted/);
   await page.getByRole("button", { name: "Kopieer veilige tekst" }).click();
+  const copyConfirmation = page.getByTestId("modal-ok");
+  if (await copyConfirmation.isVisible()) await copyConfirmation.click();
   await expect(page.getByTestId("clipboard-status")).toHaveText(/markeringen gekopieerd/);
   const copiedText = await page.evaluate(() => navigator.clipboard.readText());
   await page.getByRole("button", { name: "02 Synthetisch" }).click();

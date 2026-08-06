@@ -1,45 +1,29 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  Check,
-  Clipboard,
-  Eraser,
-  EyeOff,
-  Plus,
-  RotateCcw,
-  RotateCw,
-  ShieldCheck,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Eraser, EyeOff, RotateCcw, RotateCw } from "lucide-react";
 import { copyAndVerify } from "./clipboard";
 import { detect } from "./detectors";
+import { AppDialog } from "./AppDialog";
 import { htmlToPlainText, insertTextAtSelection } from "./html";
 import { generateWithOllama } from "./ollama";
-import { applyAction, mergeDetections, replaceAccepted, type ReviewAction } from "./review";
+import {
+  applyAction,
+  mergeDetections,
+  replaceAccepted,
+  type ReviewAction,
+  type ReviewSnapshot,
+} from "./review";
+import { ReviewBottomBar, type ClipboardStatus } from "./ReviewBottomBar";
+import { ReviewWorkspace } from "./ReviewWorkspace";
+import { HomeScreen } from "./HomeScreen";
 import { SyntheticPanel, type SyntheticEntry } from "./SyntheticPanel";
 import { createSyntheticMap, parseSyntheticMarkers, replaceSyntheticMarkers } from "./synthetic";
 import type { Detection, DetectionType } from "./types";
 import { TYPE_LABELS } from "./types";
+import { useDialog } from "./useDialog";
 
 const initialText =
   "Plak hier de tekst die je wilt controleren. Bijvoorbeeld: klantnummer 123456 of e-mail klant@example.com.";
 const typeOptions = Object.entries(TYPE_LABELS) as [DetectionType, string][];
-type ClipboardStatus =
-  | { state: "idle" }
-  | { state: "copying" }
-  | { state: "success"; message: string }
-  | { state: "error"; message: string };
-
-type DialogState =
-  | {
-      open: true;
-      title: string;
-      message: string;
-      input?: string;
-      onConfirm: (value?: string) => void;
-      onCancel: () => void;
-    }
-  | { open: false };
 
 function tokenFor(type: DetectionType, index: number) {
   return `${type.toUpperCase()}_${index}`;
@@ -60,40 +44,19 @@ function createTokens(items: Detection[]) {
   return mapping;
 }
 
-function MarkerText({ text, detections }: { text: string; detections: Detection[] }) {
-  const parts: ReactNode[] = [];
-  let cursor = 0;
-  detections.forEach((item) => {
-    if (item.start < cursor) return;
-    parts.push(<span key={`text-${item.id}`}>{text.slice(cursor, item.start)}</span>);
-    parts.push(
-      <mark
-        key={item.id}
-        className={`mark mark-${item.type} ${item.decision}`}
-        data-testid={`mark-${item.id}`}
-      >
-        {text.slice(item.start, item.end)}
-      </mark>,
-    );
-    cursor = item.end;
-  });
-  parts.push(<span key="text-end">{text.slice(cursor)}</span>);
-  return <>{parts}</>;
-}
-
 function App() {
   const [screen, setScreen] = useState<"home" | "review" | "synthetic">("home");
   const [text, setText] = useState(initialText);
   const [detections, setDetections] = useState<Detection[]>(() => detect(initialText));
-  const [history, setHistory] = useState<Detection[][]>([]);
-  const [future, setFuture] = useState<Detection[][]>([]);
+  const [history, setHistory] = useState<ReviewSnapshot[]>([]);
+  const [future, setFuture] = useState<ReviewSnapshot[]>([]);
+  const [textEditBaseline, setTextEditBaseline] = useState<ReviewSnapshot | null>(null);
   const [filter, setFilter] = useState("all");
   const [message, setMessage] = useState("Klaar voor beoordeling");
   const [selectedType, setSelectedType] = useState<DetectionType>("person");
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [toastKey, setToastKey] = useState(0);
   const [clipboardStatus, setClipboardStatus] = useState<ClipboardStatus>({ state: "idle" });
-  const [dialog, setDialog] = useState<DialogState>({ open: false });
   const [syntheticInput, setSyntheticInput] = useState("");
   const [syntheticValues, setSyntheticValues] = useState<Map<string, string>>(new Map());
   const [ollamaModel, setOllamaModel] = useState("llama3.2");
@@ -102,6 +65,8 @@ function App() {
   const [aiError, setAiError] = useState("");
   const [sessionSeed] = useState(() => Date.now());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textEditVersionRef = useRef(0);
+  const { dialog, askConfirm, askPrompt } = useDialog();
 
   const showToast = (msg: string) => {
     setMessage(msg);
@@ -115,54 +80,43 @@ function App() {
     return () => window.clearTimeout(timeout);
   }, [feedbackVisible, toastKey]);
 
-  const askConfirm = (messageText: string, title = "Bevestigen") => {
-    return new Promise<boolean>((resolve) => {
-      setDialog({
-        open: true,
-        title,
-        message: messageText,
-        onConfirm: () => {
-          setDialog({ open: false });
-          resolve(true);
-        },
-        onCancel: () => {
-          setDialog({ open: false });
-          resolve(false);
-        },
-      });
-    });
-  };
+  useEffect(() => {
+    if (!textEditBaseline) return;
+    const version = textEditVersionRef.current;
+    const timeout = window.setTimeout(() => {
+      if (version !== textEditVersionRef.current) return;
+      setHistory((items) => [...items, textEditBaseline]);
+      setFuture([]);
+      setDetections(mergeDetections(textEditBaseline.detections, detect(text), text));
+      setTextEditBaseline(null);
+      showToast("Nieuwe tekst gedetecteerd");
+    }, 200);
+    return () => window.clearTimeout(timeout);
+  }, [text, textEditBaseline]);
 
-  const askPrompt = (messageText: string, defaultValue = "") => {
-    return new Promise<string | null>((resolve) => {
-      setDialog({
-        open: true,
-        title: "Waarde aanpassen",
-        message: messageText,
-        input: defaultValue,
-        onConfirm: (value) => {
-          setDialog({ open: false });
-          resolve(value ?? null);
-        },
-        onCancel: () => {
-          setDialog({ open: false });
-          resolve(null);
-        },
-      });
-    });
+  const freshDetections = () =>
+    textEditBaseline
+      ? mergeDetections(textEditBaseline.detections, detect(text), text)
+      : detections;
+
+  const commitDetections = (next: Detection[]) => {
+    textEditVersionRef.current += 1;
+    setHistory((items) => [...items, textEditBaseline ?? { text, detections }]);
+    setFuture([]);
+    setTextEditBaseline(null);
+    setDetections(next);
   };
 
   const update = (action: ReviewAction) => {
-    setHistory((items) => [...items, detections]);
-    setFuture([]);
-    setDetections(applyAction(detections, action));
+    commitDetections(applyAction(freshDetections(), action));
   };
 
   const onTextChange = (value: string) => {
+    textEditVersionRef.current += 1;
+    if (!textEditBaseline) setTextEditBaseline({ text, detections });
     setText(value);
-    setDetections(mergeDetections(detections, detect(value), value));
+    setDetections([]);
     setFuture([]);
-    showToast("Nieuwe tekst gedetecteerd");
   };
 
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -195,17 +149,26 @@ function App() {
       detector: "manual",
       decision: "pending",
     };
-    setHistory((items) => [...items, detections]);
-    setFuture([]);
-    setDetections([...detections, manual].sort((a, b) => a.start - b.start));
+    const current = freshDetections();
+    commitDetections([...current, manual].sort((a, b) => a.start - b.start));
     showToast("Handmatige markering toegevoegd");
   };
 
   const undo = () => {
+    if (textEditBaseline) {
+      textEditVersionRef.current += 1;
+      setText(textEditBaseline.text);
+      setDetections(textEditBaseline.detections);
+      setTextEditBaseline(null);
+      showToast("Tekstwijziging ongedaan gemaakt");
+      return;
+    }
     const previous = history.at(-1);
     if (!previous) return;
-    setFuture((items) => [...items, detections]);
-    setDetections(previous);
+    setFuture((items) => [...items, { text, detections }]);
+    setText(previous.text);
+    setDetections(previous.detections);
+    setTextEditBaseline(null);
     setHistory((items) => items.slice(0, -1));
     showToast("Actie ongedaan gemaakt");
   };
@@ -213,16 +176,15 @@ function App() {
   const redo = () => {
     const next = future.at(-1);
     if (!next) return;
-    setHistory((items) => [...items, detections]);
-    setDetections(next);
+    setHistory((items) => [...items, { text, detections }]);
+    setText(next.text);
+    setDetections(next.detections);
+    setTextEditBaseline(null);
     setFuture((items) => items.slice(0, -1));
     showToast("Actie opnieuw toegepast");
   };
 
-  const tokens = useMemo(() => {
-    return createTokens(detections);
-  }, [detections]);
-
+  const tokens = useMemo(() => createTokens(detections), [detections]);
   const pending = detections.filter((item) => item.decision === "pending").length;
   const filtered = detections.filter(
     (item) =>
@@ -231,7 +193,9 @@ function App() {
       item.type === filter ||
       (filter === "low" && item.confidence < 0.7),
   );
-  const output = replaceAccepted(text, detections, tokens);
+  const acceptedCount = detections.filter(
+    (item) => item.decision === "accepted" || item.decision === "edited",
+  ).length;
 
   const syntheticMarkers = useMemo(() => parseSyntheticMarkers(syntheticInput), [syntheticInput]);
   const syntheticEntries = useMemo<SyntheticEntry[]>(
@@ -248,20 +212,24 @@ function App() {
   const syntheticOutput = replaceSyntheticMarkers(syntheticInput, syntheticValues);
 
   const copyOutput = async () => {
+    const currentDetections = freshDetections();
+    if (textEditBaseline) commitDetections(currentDetections);
+    const currentPending = currentDetections.filter((item) => item.decision === "pending").length;
     if (
-      pending > 0 &&
+      currentPending > 0 &&
       !(await askConfirm(
-        `${pending} kandidaat${pending === 1 ? " is" : "en zijn"} nog niet beoordeeld. Toch kopiëren?`,
+        `${currentPending} kandidaat${currentPending === 1 ? " is" : "en zijn"} nog niet beoordeeld. Toch kopiëren?`,
         "Onbeoordeelde kandidaten",
       ))
     )
       return;
     setClipboardStatus({ state: "copying" });
     try {
-      const count = detections.filter(
+      const currentTokens = createTokens(currentDetections);
+      await copyAndVerify(replaceAccepted(text, currentDetections, currentTokens));
+      const count = currentDetections.filter(
         (item) => item.decision === "accepted" || item.decision === "edited",
       ).length;
-      await copyAndVerify(output);
       const successMessage = `${count} markeringen gekopieerd`;
       setClipboardStatus({ state: "success", message: successMessage });
       showToast(successMessage);
@@ -273,26 +241,44 @@ function App() {
     }
   };
 
-  const replaceAll = async () => {
-    if (!detections.length) {
-      setClipboardStatus({ state: "error", message: "Geen kandidaten om te vervangen" });
-      showToast("Geen kandidaten om te vervangen");
+  const acceptPending = async () => {
+    const current = freshDetections();
+    const open = current.filter((item) => item.decision === "pending");
+    if (!open.length) {
+      showToast("Geen openstaande kandidaten");
+      return;
+    }
+    if (
+      open.length >= 10 &&
+      !(await askConfirm(
+        `Dit accepteert ${open.length} openstaande kandidaten. Doorgaan?`,
+        "Openstaande kandidaten accepteren",
+      ))
+    )
+      return;
+    commitDetections(
+      current.map((item) =>
+        item.decision === "pending" ? { ...item, decision: "accepted" as const } : item,
+      ),
+    );
+    showToast(`${open.length} openstaande kandidaten geaccepteerd`);
+  };
+
+  const forceAll = async () => {
+    const current = freshDetections();
+    if (!current.length) {
+      showToast("Geen kandidaten om te accepteren");
       return;
     }
     if (
       !(await askConfirm(
-        `Dit vervangt alle ${detections.length} geflagde items. Je kunt daarna zelf de tekst kopiëren. Doorgaan?`,
-        "Alles vervangen",
+        "Dit overschrijft ook genegeerde kandidaten. Weet je het zeker?",
+        "Forceer alle kandidaten",
       ))
     )
       return;
-    const allAccepted = detections.map((item) => ({ ...item, decision: "accepted" as const }));
-    setHistory((items) => [...items, detections]);
-    setFuture([]);
-    setDetections(allAccepted);
-    const successMessage = `${detections.length} items vervangen. Controleer de tekst en klik daarna op Kopieer veilige tekst.`;
-    setClipboardStatus({ state: "success", message: successMessage });
-    showToast(successMessage);
+    commitDetections(current.map((item) => ({ ...item, decision: "accepted" as const })));
+    showToast(`${current.length} kandidaten geaccepteerd`);
   };
 
   const generateStandardReplacements = () => {
@@ -323,15 +309,13 @@ function App() {
       );
       setSyntheticValues((current) => new Map(current).set(entry.token, replacement));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Onbekende Ollama-fout";
-      setAiError(`${message}. Controleer of Ollama draait en het model lokaal beschikbaar is.`);
+      const errorMessage = error instanceof Error ? error.message : "Onbekende Ollama-fout";
+      setAiError(
+        `${errorMessage}. Controleer of Ollama draait en het model lokaal beschikbaar is.`,
+      );
     } finally {
       setAiBusy(false);
     }
-  };
-
-  const updateSyntheticReplacement = (entry: SyntheticEntry, value: string) => {
-    setSyntheticValues((current) => new Map(current).set(entry.token, value));
   };
 
   const copySynthetic = async () => {
@@ -339,8 +323,7 @@ function App() {
       showToast("Er zijn nog geen markers om te vervangen");
       return;
     }
-    const missing = syntheticEntries.filter((entry) => !entry.replacement.trim());
-    if (missing.length) {
+    if (syntheticEntries.some((entry) => !entry.replacement.trim())) {
       showToast("Genereer eerst alle vervangers voordat je kopieert");
       return;
     }
@@ -395,44 +378,7 @@ function App() {
         </div>
       </header>
       {screen === "home" ? (
-        <section className="home-screen">
-          <div className="home-copy">
-            <p className="eyebrow">Lokale privacyfilter</p>
-            <h1>
-              Maak gevoelige tekst
-              <br />
-              <em>klaar om te delen.</em>
-            </h1>
-            <p className="home-description">
-              Amnesia Protocol helpt je gevoelige klantgegevens te vinden en te vervangen voordat je
-              tekst een ander venster of een externe dienst bereikt. Alles blijft lokaal en de
-              pseudoniem-mapping bestaat alleen zolang deze sessie open is.
-            </p>
-            <button className="start-button" type="button" onClick={() => setScreen("review")}>
-              Start een nieuwe controle <Sparkles size={17} />
-            </button>
-          </div>
-          <div className="home-aside">
-            <div className="home-shield">
-              <ShieldCheck size={26} />
-            </div>
-            <p className="home-aside-title">Geen data verlaat deze app.</p>
-            <p>
-              De mapping verdwijnt bij afsluiten. Controleer elke markering voordat je kopieert.
-            </p>
-            <div className="home-steps">
-              <span>
-                <b>01</b> Detecteer
-              </span>
-              <span>
-                <b>02</b> Beoordeel
-              </span>
-              <span>
-                <b>03</b> Kopieer veilig
-              </span>
-            </div>
-          </div>
-        </section>
+        <HomeScreen onStart={() => setScreen("review")} />
       ) : (
         <>
           <nav className="workspace-tabs" aria-label="Werklaag">
@@ -447,217 +393,45 @@ function App() {
               type="button"
               className={screen === "synthetic" ? "active" : ""}
               onClick={() => setScreen("synthetic")}
-              disabled={
-                !detections.some(
-                  (item) => item.decision === "accepted" || item.decision === "edited",
-                )
-              }
+              disabled={!acceptedCount}
             >
               02 Synthetisch
             </button>
           </nav>
           {screen === "review" ? (
             <>
-              <section className="workspace">
-                <div className="editor-panel panel">
-                  <div className="panel-head">
-                    <div>
-                      <span className="panel-kicker">BRONTEKST</span>
-                      <span className="panel-title">Te beoordeelen inhoud</span>
-                    </div>
-                    <span className="char-count">{text.length} tekens</span>
-                  </div>
-                  <div className="editor-wrap">
-                    <div className="highlight-layer" aria-hidden="true">
-                      <MarkerText text={text} detections={detections} />
-                    </div>
-                    <textarea
-                      ref={textareaRef}
-                      aria-label="Brontekst"
-                      value={text}
-                      onChange={(event) => onTextChange(event.target.value)}
-                      onPaste={handlePaste}
-                      onScroll={(event) => {
-                        const layer = event.currentTarget.previousElementSibling as HTMLElement;
-                        layer.scrollTop = event.currentTarget.scrollTop;
-                        layer.scrollLeft = event.currentTarget.scrollLeft;
-                      }}
-                      spellCheck={false}
-                    />
-                  </div>
-                  <div className="editor-foot">
-                    <span>
-                      <Sparkles size={14} /> Tip: selecteer tekst om handmatig te markeren
-                    </span>
-                    <button
-                      type="button"
-                      className="add-mark"
-                      onClick={addManual}
-                      aria-label="Markering toevoegen"
-                      title="Markering toevoegen"
-                    >
-                      <Plus size={17} />
-                    </button>
-                  </div>
-                </div>
-                <aside className="review-panel panel">
-                  <div className="panel-head">
-                    <div>
-                      <span className="panel-kicker">REVIEW</span>
-                      <span className="panel-title">
-                        Kandidaten <b>{detections.length}</b>
-                      </span>
-                    </div>
-                    <span className={`review-status ${pending ? "attention" : "ready"}`}>
-                      {pending ? `${pending} open` : "gereviewd"}
-                    </span>
-                  </div>
-                  <div className="filter-row">
-                    <button
-                      className={filter === "all" ? "active" : ""}
-                      onClick={() => setFilter("all")}
-                    >
-                      Alle
-                    </button>
-                    <button
-                      className={filter === "pending" ? "active" : ""}
-                      onClick={() => setFilter("pending")}
-                    >
-                      Open
-                    </button>
-                    <button
-                      className={filter === "accepted" ? "active" : ""}
-                      onClick={() => setFilter("accepted")}
-                    >
-                      Akkoord
-                    </button>
-                    <button
-                      className={filter === "rejected" ? "active" : ""}
-                      onClick={() => setFilter("rejected")}
-                    >
-                      Genegeerd
-                    </button>
-                  </div>
-                  <div className="candidate-list">
-                    {filtered.map((item) => (
-                      <article className={`candidate ${item.decision}`} key={item.id}>
-                        <div className="candidate-top">
-                          <span className={`type-dot type-${item.type}`} />
-                          <span className="candidate-type">{TYPE_LABELS[item.type]}</span>
-                          <span className="confidence">{Math.round(item.confidence * 100)}%</span>
-                        </div>
-                        <div className="candidate-value">{item.value}</div>
-                        {(item.decision === "accepted" || item.decision === "edited") &&
-                          tokens.has(item.value) && (
-                            <div className="candidate-token" data-testid={`token-${item.id}`}>
-                              <span>VERVANGER</span>
-                              <code>{tokens.get(item.value)}</code>
-                            </div>
-                          )}
-                        <div className="candidate-actions">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              update({ id: item.id, decision: "accepted" });
-                              showToast("Generieke vervanger aangemaakt");
-                            }}
-                            className="generate"
-                            data-testid={`generate-${item.id}`}
-                          >
-                            <Sparkles size={14} /> Genereer token
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => update({ id: item.id, decision: "rejected" })}
-                            className="reject"
-                            title="Laat deze kandidaat ongewijzigd"
-                          >
-                            <X size={14} /> Negeren
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              const next = await askPrompt("Pas de waarde aan", item.value);
-                              if (next === null) return;
-                              const trimmed = next.trim();
-                              if (!trimmed) {
-                                showToast("Waarde mag niet leeg zijn");
-                                return;
-                              }
-                              update({ id: item.id, decision: "edited", value: trimmed });
-                            }}
-                            className="edit"
-                            title="Pas de gemarkeerde waarde aan"
-                          >
-                            Waarde aanpassen
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                    {!filtered.length && (
-                      <div className="empty">
-                        <Check size={22} />
-                        <p>Geen kandidaten in deze weergave.</p>
-                      </div>
-                    )}
-                  </div>
-                </aside>
-              </section>
-              <section className="bottom-bar">
-                <div className="manual-control">
-                  <span>Handmatig label</span>
-                  <select
-                    aria-label="Type handmatig label"
-                    value={selectedType}
-                    onChange={(event) => setSelectedType(event.target.value as DetectionType)}
-                  >
-                    {typeOptions.map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="copy-preview">
-                  <span className="output-label">OUTPUT</span>
-                  <span>
-                    {
-                      detections.filter(
-                        (item) => item.decision === "accepted" || item.decision === "edited",
-                      ).length
-                    }{" "}
-                    vervangingen voorbereid
-                  </span>
-                </div>
-                <div
-                  className={`clipboard-status ${clipboardStatus.state}`}
-                  aria-live="polite"
-                  data-testid="clipboard-status"
-                >
-                  {clipboardStatus.state === "copying" && "Kopiëren..."}
-                  {clipboardStatus.state === "success" && clipboardStatus.message}
-                  {clipboardStatus.state === "error" && clipboardStatus.message}
-                </div>
-                <button
-                  className="bulk-copy-button"
-                  type="button"
-                  onClick={replaceAll}
-                  disabled={clipboardStatus.state === "copying"}
-                  data-testid="replace-all"
-                  title="Vervang alle geflagde items zonder ze te kopiëren"
-                >
-                  <Sparkles size={16} /> Alles vervangen
-                </button>
-                <button
-                  className="copy-button"
-                  type="button"
-                  onClick={copyOutput}
-                  disabled={clipboardStatus.state === "copying"}
-                >
-                  <Clipboard size={17} />{" "}
-                  {clipboardStatus.state === "copying" ? "Kopiëren..." : "Kopieer veilige tekst"}
-                </button>
-              </section>
+              <ReviewWorkspace
+                text={text}
+                detections={detections}
+                filtered={filtered}
+                tokens={tokens}
+                filter={filter}
+                pending={pending}
+                selectedType={selectedType}
+                textareaRef={textareaRef}
+                onTextChange={onTextChange}
+                onPaste={handlePaste}
+                onScroll={(event) => {
+                  const layer = event.currentTarget.previousElementSibling as HTMLElement;
+                  layer.scrollTop = event.currentTarget.scrollTop;
+                  layer.scrollLeft = event.currentTarget.scrollLeft;
+                }}
+                onFilterChange={setFilter}
+                onAddManual={addManual}
+                onUpdate={update}
+                onPrompt={askPrompt}
+                onToast={showToast}
+              />
+              <ReviewBottomBar
+                typeOptions={typeOptions}
+                selectedType={selectedType}
+                acceptedCount={acceptedCount}
+                clipboardStatus={clipboardStatus}
+                onTypeChange={setSelectedType}
+                onAcceptPending={() => void acceptPending()}
+                onForceAll={() => void forceAll()}
+                onCopy={() => void copyOutput()}
+              />
             </>
           ) : (
             <SyntheticPanel
@@ -676,7 +450,9 @@ function App() {
               onFormatHintChange={setOtherFormatHint}
               onGenerateAll={generateStandardReplacements}
               onGenerateOther={(entry) => void generateOther(entry)}
-              onReplacementChange={updateSyntheticReplacement}
+              onReplacementChange={(entry, value) =>
+                setSyntheticValues((current) => new Map(current).set(entry.token, value))
+              }
               onCopy={() => void copySynthetic()}
             />
           )}
@@ -688,56 +464,7 @@ function App() {
           <span>{message}</span>
         </div>
       )}
-      {dialog.open && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" data-testid="modal">
-          <div className="modal">
-            <div className="modal-head">
-              <strong>{dialog.title}</strong>
-            </div>
-            <p className="modal-message">{dialog.message}</p>
-            {dialog.input !== undefined && (
-              <input
-                type="text"
-                className="modal-input"
-                defaultValue={dialog.input}
-                data-testid="modal-input"
-                autoFocus
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") dialog.onConfirm(event.currentTarget.value);
-                  if (event.key === "Escape") dialog.onCancel();
-                }}
-              />
-            )}
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="modal-cancel"
-                data-testid="modal-cancel"
-                onClick={dialog.onCancel}
-              >
-                Annuleren
-              </button>
-              <button
-                type="button"
-                className="modal-confirm"
-                data-testid="modal-ok"
-                onClick={() => {
-                  if (dialog.input !== undefined) {
-                    const input = document.querySelector(
-                      '[data-testid="modal-input"]',
-                    ) as HTMLInputElement | null;
-                    dialog.onConfirm(input?.value ?? "");
-                  } else {
-                    dialog.onConfirm();
-                  }
-                }}
-              >
-                Doorgaan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AppDialog dialog={dialog} />
       <footer>
         <span>
           <Eraser size={13} /> Alleen sessiegeheugen · geen opslag

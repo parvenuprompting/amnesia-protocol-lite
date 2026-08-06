@@ -5,6 +5,7 @@ export type DetectionType =
   | "bsn"
   | "ip"
   | "postcode"
+  | "address"
   | "date"
   | "customer"
   | "transaction"
@@ -34,6 +35,7 @@ export const TYPE_LABELS: Record<DetectionType, string> = {
   bsn: "BSN",
   ip: "IP-adres",
   postcode: "Postcode",
+  address: "Adres",
   date: "Datum",
   customer: "Klantnummer",
   transaction: "Transactie",

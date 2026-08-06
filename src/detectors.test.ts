@@ -108,7 +108,7 @@ describe("detectors", () => {
     const detections = result.map((item) => [item.type, item.value]);
 
     expect(detections).toEqual([
-      ["postcode", "Wassenaarseweg 220"],
+      ["address", "Wassenaarseweg 220"],
       ["postcode", "2596 EC Den Haag"],
       ["phone", "088 269 2222"],
       ["link", "https://anwb.nl"],
