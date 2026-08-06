@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detect, isValidBsn, isValidIban, resolveOverlaps } from "./detectors";
+import { detect, detectTerminal, isValidBsn, isValidIban, resolveOverlaps } from "./detectors";
 import { mergeDetections } from "./review";
 
 describe("checksums", () => {
@@ -80,6 +80,20 @@ describe("detectors", () => {
       ["link", "https://example.com/path"],
       ["link", "http://test.org"],
     ]);
+  });
+
+  it("detects terminal secrets, credentials and account paths", () => {
+    const terminal = [
+      "export API_KEY=ghp_1234567890abcdefghijklmnopqrstuv",
+      "Authorization: Bearer abcdefghijklmnop123456",
+      "DATABASE_URL=postgresql://user:password@localhost:5432/app",
+      "/Users/jan.de.vries/projects/client-api",
+      "-----BEGIN PRIVATE KEY-----\nsecret data\n-----END PRIVATE KEY-----",
+    ].join("\n");
+    const result = detectTerminal(terminal);
+    expect(result.map((item) => item.type)).toEqual(
+      expect.arrayContaining(["apiKey", "accessToken", "credentialUrl", "account", "privateKey"]),
+    );
   });
 
   it("handles long text while detecting a value near the end", () => {

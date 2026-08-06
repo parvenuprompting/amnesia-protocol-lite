@@ -13,6 +13,7 @@ import {
   type ChatMessage,
 } from "./chat";
 import { ChatPanel } from "./ChatPanel";
+import { detectTerminal } from "./detectors";
 import { HomeScreen } from "./HomeScreen";
 import {
   generateWithOllama,
@@ -39,6 +40,7 @@ const initialText =
 
 function App() {
   const [screen, setScreen] = useState<"home" | "review" | "synthetic" | "chat">("home");
+  const [reviewMode, setReviewMode] = useState<"standard" | "terminal">("standard");
   const { settings, updateSettings } = useAppSettings();
   const [message, setMessage] = useState("Klaar voor beoordeling");
   const [feedbackVisible, setFeedbackVisible] = useState(false);
@@ -237,6 +239,12 @@ function App() {
     );
   };
 
+  const startTerminal = () => {
+    review.resetDocument("", detectTerminal);
+    setReviewMode("terminal");
+    setScreen("review");
+  };
+
   const attachChatContext = () => {
     if (!syntheticEntries.length || syntheticEntries.some((entry) => !entry.replacement.trim())) {
       showToast("Genereer eerst volledige synthetische output");
@@ -358,7 +366,14 @@ function App() {
         </div>
       </header>
       {screen === "home" ? (
-        <HomeScreen onStart={() => setScreen("review")} onStartChat={() => setScreen("chat")} />
+        <HomeScreen
+          onStart={() => {
+            setReviewMode("standard");
+            setScreen("review");
+          }}
+          onStartChat={() => setScreen("chat")}
+          onStartTerminal={startTerminal}
+        />
       ) : (
         <>
           <nav className="workspace-tabs" aria-label="Werklaag">
@@ -408,6 +423,7 @@ function App() {
                 onUpdate={review.update}
                 onPrompt={askPrompt}
                 onToast={showToast}
+                mode={reviewMode}
               />
               <ReviewBottomBar
                 typeOptions={reviewTypeOptions}

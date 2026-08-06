@@ -13,6 +13,25 @@ Amnesia Protocol Lite is een lokale desktopwerkplek voor het gecontroleerd opsch
 
 De app is ontworpen voor persoonlijk gebruik op één Mac. Het doel is gecontroleerde pseudonimisering en synthetische vervanging, niet anonimiteit of een garantie dat alle indirecte identificerende informatie verdwijnt.
 
+## Architectuur
+
+```mermaid
+flowchart LR
+    A[Brontekst of Terminal-uitvoer] --> B[Lokale detectoren]
+    B --> C[Menselijke review]
+    C --> D[Getypeerde markers]
+    D --> E[Veilige gekopieerde tekst]
+    E --> F[Synthetische tweede laag]
+    F --> G[Fictieve waarden]
+    G --> H[Lokale chat]
+    H --> I[Ollama op localhost]
+    J[Instellingen] --> F
+    J --> H
+    J --> I
+```
+
+De app heeft geen serverlaag. De standaardflow blijft binnen de desktopapp; alleen de optionele lokale AI-functies praten met Ollama op dezelfde Mac.
+
 ## Screenshots
 
 ### Welkomstscherm
@@ -60,6 +79,14 @@ De app is ontworpen voor persoonlijk gebruik op één Mac. Het doel is gecontrol
 5. Gebruik voor `OTHER` optioneel een lokaal Ollama-model.
 6. Controleer en corrigeer de fictieve waarden.
 7. Klik op `Kopieer synthetische tekst`.
+
+### Terminal: Uitvoer opschonen
+
+1. Klik op `Terminal` vanaf het welkomstscherm.
+2. Plak terminaluitvoer in de editor.
+3. Laat mogelijke API keys, tokens, private keys, credential-URL's, accountpaden en Git-remotes markeren.
+4. Beoordeel iedere kandidaat zoals in de normale reviewflow.
+5. Kopieer de opgeschoonde terminaltekst en gebruik optioneel de synthetische laag.
 
 ### Laag 3: Lokale chat
 
@@ -217,7 +244,7 @@ hdiutil create \
   -srcfolder "src-tauri/target/release/bundle/macos/Amnesia Protocol.app" \
   -ov \
   -format UDZO \
-  "src-tauri/target/release/bundle/dmg/Amnesia Protocol_0.1.0_aarch64.dmg"
+  "src-tauri/target/release/bundle/dmg/Amnesia Protocol_0.2.4_aarch64.dmg"
 ```
 
 ## Klembordcontrole
@@ -230,7 +257,9 @@ De browser-e2e-tests geven Playwright expliciete klembordrechten en controleren 
 
 ## Privacy en beveiliging
 
-De MVP doet geen externe netwerkverzoeken tijdens de normale workflow en heeft geen analytics of telemetrie. De optionele AI-functie voor `OTHER` praat uitsluitend met een lokaal Ollama-model op `localhost`. Tauri-capabilities zijn beperkt tot de clipboard-plugin.
+Zolang je de app lokaal gebruikt, blijft de normale verwerking op je Mac. De detectoren werken lokaal, de review gebeurt lokaal en de mapping leeft alleen in het geheugen van deze sessie. De tweede laag ontvangt alleen de tekst die je zelf kopieert en plakt; de oorspronkelijke bronmapping wordt niet automatisch doorgegeven. De optionele AI-functies praten uitsluitend met Ollama op `localhost`.
+
+Er is geen account, backend, analytics of telemetrie. De app voert geen Terminal-commando's uit en leest geen Terminalvensters automatisch; Terminaldata wordt alleen verwerkt nadat je die zelf plakt. Alleen niet-gevoelige voorkeuren zoals taal, modelbeleid en clipboardtimer worden lokaal tussen appstarts bewaard.
 
 FileVault beschermt de Mac op schijfniveau. De app gebruikt in deze versie geen extra encryptielaag omdat de mapping niet persistent wordt opgeslagen. De brondata en mapping leven tijdens gebruik wel tijdelijk in het geheugen van de applicatie.
 
@@ -259,11 +288,13 @@ src/
   AppDialog.tsx       Modalweergave en focusbeheer
   ChatPanel.tsx       Lokale chat met optionele synthetische context
   chat.ts             Chatlimieten en contextbeheer
+  SettingsPanel.tsx   Persistente voorkeuren en Ollama-modelbeheer
+  settings.ts         Lokale voorkeuren tussen appstarts
   useDialog.ts        Confirm- en promptlogica
   useReviewState.ts   Debounced detectie, history en reviewacties
   useClipboard.ts     Clipboardstatus en readback-verificatie
   SyntheticPanel.tsx  Tweede laag voor geplakte markers
-  detectors.ts        Lokale detectoren, contextregels en checksums
+  detectors.ts        Review- en Terminal-detectoren, contextregels en checksums
   synthetic.ts        Markerparser en fictieve datageneratoren
   ollama.ts           Lokale Ollama-integratie voor OTHER
   review.ts           Reviewacties, merge-logica en vervanging
@@ -278,4 +309,4 @@ src-tauri/
 
 ## Status
 
-De huidige implementatie bevat de Fase 1/2-MVP plus een lokale chatlaag: lokale review, uitgebreide Nederlandse detectieregels, sessiegebonden pseudonimisering, een onafhankelijk geplakte synthetische tweede laag, Engelse synthetische waarden, optionele lokale Ollama-AI, lokale modeldownloads met hardwarewaarschuwing, clipboardcontrole, snapshot-history, gescheiden veilige en geforceerde bulkacties, debounce voor langere teksten en een begrensde lokale chat. De tests en productiebuild moeten groen zijn voordat wijzigingen als afgerond worden beschouwd.
+De huidige implementatie bevat de Fase 1/2-MVP plus Terminal-opschoning en een lokale chatlaag: lokale review, detectie van Terminal-secrets en accountpaden, uitgebreide Nederlandse detectieregels, sessiegebonden pseudonimisering, een onafhankelijk geplakte synthetische tweede laag, Engelse synthetische waarden, optionele lokale Ollama-AI, lokale modeldownloads met hardwarewaarschuwing, clipboardcontrole, snapshot-history, gescheiden veilige en geforceerde bulkacties, debounce voor langere teksten en een begrensde lokale chat. De tests en productiebuild moeten groen zijn voordat wijzigingen als afgerond worden beschouwd.

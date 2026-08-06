@@ -34,11 +34,18 @@ type UseReviewStateOptions = {
   initialText: string;
   onToast: (message: string) => void;
   askConfirm: (message: string, title?: string) => Promise<boolean>;
+  detector?: (text: string) => Detection[];
 };
 
-export function useReviewState({ initialText, onToast, askConfirm }: UseReviewStateOptions) {
+export function useReviewState({
+  initialText,
+  onToast,
+  askConfirm,
+  detector = detect,
+}: UseReviewStateOptions) {
   const [text, setText] = useState(initialText);
-  const [detections, setDetections] = useState<Detection[]>(() => detect(initialText));
+  const [detections, setDetections] = useState<Detection[]>(() => detector(initialText));
+  const [detectText, setDetectText] = useState<(text: string) => Detection[]>(() => detector);
   const [history, setHistory] = useState<ReviewSnapshot[]>([]);
   const [future, setFuture] = useState<ReviewSnapshot[]>([]);
   const [textEditBaseline, setTextEditBaseline] = useState<ReviewSnapshot | null>(null);
@@ -54,16 +61,16 @@ export function useReviewState({ initialText, onToast, askConfirm }: UseReviewSt
       if (version !== textEditVersionRef.current) return;
       setHistory((items) => [...items, textEditBaseline]);
       setFuture([]);
-      setDetections(mergeDetections(textEditBaseline.detections, detect(text), text));
+      setDetections(mergeDetections(textEditBaseline.detections, detectText(text), text));
       setTextEditBaseline(null);
       onToast("Nieuwe tekst gedetecteerd");
     }, 200);
     return () => window.clearTimeout(timeout);
-  }, [onToast, text, textEditBaseline]);
+  }, [detectText, onToast, text, textEditBaseline]);
 
   const freshDetections = () =>
     textEditBaseline
-      ? mergeDetections(textEditBaseline.detections, detect(text), text)
+      ? mergeDetections(textEditBaseline.detections, detectText(text), text)
       : detections;
 
   const commitDetections = (next: Detection[]) => {
@@ -150,6 +157,16 @@ export function useReviewState({ initialText, onToast, askConfirm }: UseReviewSt
     onToast("Actie opnieuw toegepast");
   };
 
+  const resetDocument = (nextText: string, nextDetector: (text: string) => Detection[]) => {
+    textEditVersionRef.current += 1;
+    setDetectText(() => nextDetector);
+    setText(nextText);
+    setDetections(nextDetector(nextText));
+    setHistory([]);
+    setFuture([]);
+    setTextEditBaseline(null);
+  };
+
   const acceptPending = async () => {
     const current = freshDetections();
     const open = current.filter((item) => item.decision === "pending");
@@ -234,6 +251,7 @@ export function useReviewState({ initialText, onToast, askConfirm }: UseReviewSt
     redo,
     acceptPending,
     forceAll,
+    resetDocument,
     prepareOutput,
     setFilter,
     setSelectedType,

@@ -21,6 +21,7 @@ type ReviewWorkspaceProps = {
   onUpdate: (action: ReviewAction) => void;
   onPrompt: (message: string, value: string) => Promise<string | null>;
   onToast: (message: string) => void;
+  mode: "standard" | "terminal";
 };
 
 function MarkerText({
@@ -76,6 +77,7 @@ export function ReviewWorkspace({
   onUpdate,
   onPrompt,
   onToast,
+  mode,
 }: ReviewWorkspaceProps) {
   const candidateRefs = useRef(new Map<string, HTMLElement>());
   const selectCandidate = (id: string) => {
@@ -89,8 +91,10 @@ export function ReviewWorkspace({
       <div className="editor-panel panel">
         <div className="panel-head">
           <div>
-            <span className="panel-kicker">BRONTEKST</span>
-            <span className="panel-title">Te beoordelen inhoud</span>
+            <span className="panel-kicker">{mode === "terminal" ? "TERMINAL" : "BRONTEKST"}</span>
+            <span className="panel-title">
+              {mode === "terminal" ? "Terminaluitvoer opschonen" : "Te beoordelen inhoud"}
+            </span>
           </div>
           <span className="char-count">{text.length} tekens</span>
         </div>

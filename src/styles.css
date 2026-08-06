@@ -245,6 +245,21 @@ button:disabled {
 .chat-start-button:hover {
   background: #e2eddc;
 }
+.terminal-start-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #c9c1b4;
+  border-radius: 7px;
+  padding: 10px 15px;
+  color: #5d5a51;
+  background: #eeece6;
+  font-size: 11px;
+  font-weight: 700;
+}
+.terminal-start-button:hover {
+  background: #e3e0d7;
+}
 .start-button:hover {
   background: #4b4a43;
   transform: translateY(-1px);

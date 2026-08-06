@@ -65,6 +65,16 @@ test("start een lokale chat vanaf de homepage", async ({ page }) => {
   await expect(page.getByText("Vraag het lokale model", { exact: true })).not.toBeVisible();
 });
 
+test("start Terminal vanaf de homepage en detecteert secrets", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Terminal" }).click();
+  await expect(page.getByText("Terminaluitvoer opschonen", { exact: true })).toBeVisible();
+  await page
+    .getByRole("textbox", { name: "Brontekst" })
+    .fill("export API_KEY=ghp_1234567890abcdefghijklmnopqrstuv");
+  await expect(page.getByRole("complementary").getByText("API-key", { exact: true })).toBeVisible();
+});
+
 test("opent instellingen vanaf de topbar", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Instellingen" }).click();
