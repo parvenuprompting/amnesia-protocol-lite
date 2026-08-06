@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { copyAndVerify } from "./clipboard";
+import { clearClipboardIfMatches, copyAndVerify } from "./clipboard";
 
 describe("clipboard adapter", () => {
   it("writes and verifies the copied text", async () => {
@@ -23,5 +23,20 @@ describe("clipboard adapter", () => {
     };
     await expect(copyAndVerify("EMAIL_1", api)).rejects.toThrow("permission denied");
     expect(api.readText).not.toHaveBeenCalled();
+  });
+
+  it("clears the clipboard only when its content still matches", async () => {
+    const api = {
+      writeText: vi.fn(async () => undefined),
+      readText: vi.fn().mockResolvedValueOnce("EMAIL_1").mockResolvedValueOnce(""),
+    };
+    await expect(clearClipboardIfMatches("EMAIL_1", api)).resolves.toBe(true);
+    expect(api.writeText).toHaveBeenCalledWith("");
+  });
+
+  it("does not overwrite clipboard content changed by another app", async () => {
+    const api = { writeText: vi.fn(), readText: vi.fn(async () => "new clipboard content") };
+    await expect(clearClipboardIfMatches("EMAIL_1", api)).resolves.toBe(false);
+    expect(api.writeText).not.toHaveBeenCalled();
   });
 });

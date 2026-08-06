@@ -195,6 +195,8 @@ hdiutil create \
 
 Beide kopieeracties gebruiken dezelfde lokale clipboardadapter. Na het schrijven leest Amnesia Protocol het klembord direct terug en vergelijkt het resultaat met de verwachte tekst. Alleen bij een overeenkomende readback wordt succes gemeld. De UI toont tijdens het kopiëren `Kopiëren...` en daarna een blijvende succes- of foutstatus naast de knoppen.
 
+Het klembord wordt standaard na 60 seconden automatisch geleegd. In de reviewbalk kan dit worden aangepast naar 30 seconden, 60 seconden, 5 minuten of `Nooit`. De app wist alleen wanneer de clipboardinhoud nog exact overeenkomt met de laatst door Amnesia Protocol gekopieerde tekst; inhoud die intussen door een andere app is geplaatst blijft ongemoeid.
+
 De browser-e2e-tests geven Playwright expliciete klembordrechten en controleren de gekopieerde inhoud. Dit valideert de browserfallback. Controleer voor een native macOS-release ook handmatig de gebouwde `.app`: kopieer een tekst met een token, plak die in een lokale teksteditor en controleer dat bijvoorbeeld `EMAIL_1` aanwezig is. De native Tauri-permissies staan in `src-tauri/capabilities/default.json`.
 
 ## Privacy en beveiliging

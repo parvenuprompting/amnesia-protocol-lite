@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Eraser, EyeOff, RotateCcw, RotateCw } from "lucide-react";
 import { AppDialog } from "./AppDialog";
+import type { ClipboardClearDelay } from "./clipboard";
 import { HomeScreen } from "./HomeScreen";
 import { generateWithOllama } from "./ollama";
 import { ReviewBottomBar } from "./ReviewBottomBar";
@@ -24,6 +25,7 @@ function App() {
   const [message, setMessage] = useState("Klaar voor beoordeling");
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [toastKey, setToastKey] = useState(0);
+  const [clipboardClearAfter, setClipboardClearAfter] = useState<ClipboardClearDelay>(60_000);
   const [syntheticInput, setSyntheticInput] = useState("");
   const [syntheticValues, setSyntheticValues] = useState<Map<string, string>>(new Map());
   const [ollamaModel, setOllamaModel] = useState("llama3.2");
@@ -45,7 +47,7 @@ function App() {
     onToast: showToast,
     askConfirm,
   });
-  const clipboard = useClipboard(showToast);
+  const clipboard = useClipboard(showToast, clipboardClearAfter);
 
   useEffect(() => {
     if (!feedbackVisible) return;
@@ -225,10 +227,12 @@ function App() {
                 selectedType={review.selectedType}
                 acceptedCount={review.acceptedCount}
                 clipboardStatus={clipboard.status}
+                clipboardClearAfter={clipboardClearAfter}
                 onTypeChange={review.setSelectedType}
                 onAcceptPending={() => void review.acceptPending()}
                 onForceAll={() => void review.forceAll()}
                 onCopy={() => void copyOutput()}
+                onClipboardClearAfterChange={setClipboardClearAfter}
               />
             </>
           ) : (
