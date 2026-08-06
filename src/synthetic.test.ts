@@ -16,6 +16,7 @@ describe("synthetic generators", () => {
       { type: "email" as const, value: "persoon@example.com" },
       { type: "person" as const, value: "Jan de Vries" },
       { type: "link" as const, value: "https://example.com/account" },
+      { type: "address" as const, value: "Dorpsstraat 42" },
     ];
 
     expect(createSyntheticMap(values, 42)).toEqual(createSyntheticMap(values, 42));
@@ -34,10 +35,11 @@ describe("synthetic generators", () => {
   });
 
   it("parses only supported markers and replaces them without touching other text", () => {
-    const text = "Mail EMAIL_1 naar CUSTOMER_2. Laat CODE_1 ongewijzigd.";
+    const text = "Mail EMAIL_1 naar CUSTOMER_2 op ADDRESS_3. Laat CODE_1 ongewijzigd.";
     expect(parseSyntheticMarkers(text)).toEqual([
       { token: "EMAIL_1", type: "email" },
       { token: "CUSTOMER_2", type: "customer" },
+      { token: "ADDRESS_3", type: "address" },
     ]);
     expect(
       replaceSyntheticMarkers(
@@ -45,8 +47,9 @@ describe("synthetic generators", () => {
         new Map([
           ["EMAIL_1", "mila@example.nl"],
           ["CUSTOMER_2", "847291503"],
+          ["ADDRESS_3", "Lindelaan 42"],
         ]),
       ),
-    ).toBe("Mail mila@example.nl naar 847291503. Laat CODE_1 ongewijzigd.");
+    ).toBe("Mail mila@example.nl naar 847291503 op Lindelaan 42. Laat CODE_1 ongewijzigd.");
   });
 });

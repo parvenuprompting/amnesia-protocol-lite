@@ -108,7 +108,7 @@ describe("detectors", () => {
     const detections = result.map((item) => [item.type, item.value]);
 
     expect(detections).toEqual([
-      ["postcode", "Dorpsstraat 42"],
+      ["address", "Dorpsstraat 42"],
       ["postcode", "1012 AB Amsterdam"],
       ["phone", "020 123 4567"],
       ["link", "https://voorbeeld.nl"],

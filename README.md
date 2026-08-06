@@ -44,7 +44,7 @@ De app is ontworpen voor persoonlijk gebruik op één Mac. Het doel is gecontrol
 3. Bekijk de automatisch gevonden kandidaten.
 4. Kies per kandidaat `Genereer token`, `Negeren` of `Waarde aanpassen`.
 5. Voeg gemiste passages handmatig toe met de `+`-knop.
-6. Gebruik eventueel `Alles vervangen` na de expliciete bevestiging.
+6. Gebruik eventueel `Accepteer openstaande`; eerdere genegeerde of aangepaste kandidaten blijven ongemoeid.
 7. Controleer de vervangingen en klik op `Kopieer veilige tekst`.
 
 ### Laag 2: Synthetische vervanging
@@ -57,7 +57,7 @@ De app is ontworpen voor persoonlijk gebruik op één Mac. Het doel is gecontrol
 6. Controleer en corrigeer de fictieve waarden.
 7. Klik op `Kopieer synthetische tekst`.
 
-De bulkactie vervangt alle geflagde kandidaten in één keer, inclusief eerder genegeerde kandidaten, maar kopieert niets automatisch. Gebruik die actie alleen wanneer dat bewust gewenst is en controleer daarna de tekst voordat je op `Kopieer veilige tekst` klikt.
+De veilige bulkactie accepteert alleen openstaande kandidaten. `Forceer alle kandidaten` is een aparte, expliciet bevestigde actie die ook eerder genegeerde kandidaten accepteert. Geen van beide acties kopieert automatisch; controleer de tekst altijd voordat je op `Kopieer veilige tekst` klikt.
 
 ## Detectie
 
@@ -69,7 +69,7 @@ De detectoren werken volledig lokaal met regexen, contextregels en checksums waa
 - BSN met elfproef-validatie
 - IPv4-adressen
 - Nederlandse postcodes, inclusief plaatscontext
-- Straatadressen met huisnummer
+- Straatadressen met huisnummer als `address`
 - Numerieke en geschreven datums, inclusief korte jaaraanduidingen
 - Internetdomeinen en websites
 - Persoonsnamen met initialen en contextlabels zoals `naam:` of `contactpersoon:`
@@ -221,7 +221,12 @@ Let op:
 
 ```text
 src/
-  App.tsx             Reviewworkspace, tabs en sessiestate
+  App.tsx             App-shell en laagselectie
+  HomeScreen.tsx      Welkomstscherm
+  ReviewWorkspace.tsx Revieweditor en kandidaatlijst
+  ReviewBottomBar.tsx Reviewacties en clipboardknoppen
+  AppDialog.tsx       Modalweergave en focusbeheer
+  useDialog.ts        Confirm- en promptlogica
   SyntheticPanel.tsx  Tweede laag voor geplakte markers
   detectors.ts        Lokale detectoren, contextregels en checksums
   synthetic.ts        Markerparser en fictieve datageneratoren
@@ -238,4 +243,4 @@ src-tauri/
 
 ## Status
 
-De huidige implementatie bevat de Fase 1/2-MVP: lokale review, uitgebreide Nederlandse detectieregels, sessiegebonden pseudonimisering, een onafhankelijk geplakte synthetische tweede laag, optionele lokale Ollama-AI, klembordcontrole en een expliciete bulkactie. De tests en productiebuild moeten groen zijn voordat wijzigingen als afgerond worden beschouwd.
+De huidige implementatie bevat de Fase 1/2-MVP: lokale review, uitgebreide Nederlandse detectieregels, sessiegebonden pseudonimisering, een onafhankelijk geplakte synthetische tweede laag, optionele lokale Ollama-AI, klembordcontrole, snapshot-history en gescheiden veilige en geforceerde bulkacties. De tests en productiebuild moeten groen zijn voordat wijzigingen als afgerond worden beschouwd.

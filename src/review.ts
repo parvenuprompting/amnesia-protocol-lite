@@ -2,6 +2,20 @@ import { resolveOverlaps } from "./detectors";
 import type { Decision, Detection, DetectionType } from "./types";
 
 export type ReviewAction = { id: string; decision: Decision; value?: string; type?: DetectionType };
+export type ReviewSnapshot = { text: string; detections: Detection[] };
+
+function restoreManualStart(item: Detection, text: string): number | null {
+  if (
+    item.start >= 0 &&
+    item.end <= text.length &&
+    text.slice(item.start, item.end) === item.value
+  ) {
+    return item.start;
+  }
+  const first = text.indexOf(item.value);
+  if (first === -1 || text.indexOf(item.value, first + item.value.length) !== -1) return null;
+  return first;
+}
 
 export function mergeDetections(
   previous: Detection[],
@@ -20,8 +34,8 @@ export function mergeDetections(
   const stillPresentManual = previous
     .filter((item) => item.detector === "manual")
     .map((item) => {
-      const start = text.indexOf(item.value);
-      if (start === -1) return null;
+      const start = restoreManualStart(item, text);
+      if (start === null) return null;
       return { ...item, start, end: start + item.value.length };
     })
     .filter((item): item is Detection => item !== null);

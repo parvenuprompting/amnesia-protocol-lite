@@ -24,7 +24,7 @@ const patterns: Array<{ type: DetectionType; regex: RegExp; confidence: number }
     confidence: 0.92,
   },
   {
-    type: "postcode",
+    type: "address",
     regex:
       /\b[A-Z][a-z]+(?:straat|weg|laan|plein|gracht|kade|dijk|steeg|singel|dreef|berg|dorp|hof|pad|allee|ring)\s+\d+\s?[a-zA-Z]?(?!\d)/g,
     confidence: 0.93,
@@ -122,7 +122,7 @@ const contextPatterns: ContextPattern[] = [
     confidence: 0.95,
   },
   {
-    type: "postcode",
+    type: "address",
     regex:
       /\b(?:adres|straat|woonadres|postadres|vestigingsadres)\s*[:#-]?\s*(?<value>[A-Z][a-zA-Z0-9\s.-]+?\s+\d+\s?[a-zA-Z]?)\b/gi,
     confidence: 0.95,

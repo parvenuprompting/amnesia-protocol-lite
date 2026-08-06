@@ -708,6 +708,20 @@ button:disabled {
 .bulk-copy-button:hover {
   background: #eddbc7;
 }
+.force-all-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d8aaa2;
+  border-radius: 7px;
+  padding: 10px 14px;
+  color: #8c4f47;
+  background: #f6e1dd;
+  font-size: 11px;
+}
+.force-all-button:hover {
+  background: #efcbc5;
+}
 footer {
   max-width: 1250px;
   display: flex;

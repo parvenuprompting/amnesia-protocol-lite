@@ -14,6 +14,7 @@ const MARKER_TYPES: Record<string, DetectionType> = {
   BSN: "bsn",
   IP: "ip",
   POSTCODE: "postcode",
+  ADDRESS: "address",
   DATE: "date",
   CUSTOMER: "customer",
   TRANSACTION: "transaction",
@@ -256,6 +257,8 @@ export function generateSyntheticValue(
         return formatPostcodeWithCity(rng);
       }
       return formatPostcode(rng);
+    case "address":
+      return formatAddress(rng);
     case "date":
       return formatDate(rng);
     case "customer":
