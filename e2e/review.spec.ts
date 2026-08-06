@@ -18,6 +18,9 @@ test("plakken, reviewen, handmatig markeren en undo", async ({ page }) => {
   await expect(candidates.nth(0)).toHaveClass(/accepted/);
   await expect(candidates.nth(0).getByText("EMAIL_1", { exact: true })).toBeVisible();
   await expect(candidates.nth(1)).toHaveClass(/rejected/);
+  await page.getByRole("button", { name: "Kopieer veilige tekst" }).click();
+  await expect(page.getByTestId("clipboard-status")).toHaveText(/markeringen gekopieerd/);
+  await expect(page.evaluate(() => navigator.clipboard.readText())).resolves.toContain("EMAIL_1");
   await editor.fill("Mail klant@example.com voor klantnummer 123456 aangepast.");
   await expect(candidates.nth(0)).toHaveClass(/accepted/);
   await expect(candidates.nth(1)).toHaveClass(/rejected/);
@@ -34,6 +37,9 @@ test("plakken, reviewen, handmatig markeren en undo", async ({ page }) => {
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByTestId("replace-all-copy").click();
   await expect(page.getByRole("status")).toHaveText(/items vervangen en gekopieerd/);
+  await expect(page.evaluate(() => navigator.clipboard.readText())).resolves.toContain(
+    "CUSTOMER_1",
+  );
   await page.screenshot({ path: "test-results/amnesia-review.png", fullPage: true });
 });
 
