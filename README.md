@@ -38,7 +38,7 @@ De app is bedoeld voor persoonlijk gebruik op één Mac. Het doel is gecontrolee
 5. Voeg gemiste passages handmatig toe met de `+`-knop.
 6. Gebruik eventueel `Alles vervangen` na de expliciete bevestiging.
 7. Controleer de vervangingen en klik daarna op `Kopieer veilige tekst`.
-8. Open optioneel tabblad `02 Synthetisch` om tokens te vervangen door realistische fictieve waarden.
+8. Open optioneel tabblad `02 Synthetisch`, plak daar zelf de gekopieerde veilige tekst en klik op `Genereer standaardvervangers`.
 
 De bulkactie vervangt alle geflagde kandidaten in één keer, inclusief eerder genegeerde kandidaten, maar kopieert niets automatisch. Gebruik die actie alleen wanneer dat bewust gewenst is en controleer daarna de tekst voordat je op `Kopieer veilige tekst` klikt.
 
@@ -78,7 +78,7 @@ Dezelfde waarde krijgt binnen één actieve sessie hetzelfde token. Bij het slui
 
 ## Synthetische tweede laag
 
-In tabblad `02 Synthetisch` worden goedgekeurde tokens opnieuw opgebouwd als realistische, volledig fictieve Nederlandse waarden. E-mailadressen, personen, telefoonnummers, IBAN's, BSN's, postcodes, datums, identifiers en links worden lokaal en deterministisch gegenereerd. De tekst wordt pas gekopieerd nadat alle vervangers zijn ingevuld.
+In tabblad `02 Synthetisch` plakt de gebruiker eerst zelf de veilige tekst uit laag 1. Alleen markers zoals `EMAIL_1`, `CUSTOMER_1` en `LINK_1` worden herkend; de tweede laag ontvangt geen bronwaarden uit de eerste laag. Na een expliciete klik worden de markers opnieuw opgebouwd als realistische, volledig fictieve Nederlandse waarden. E-mailadressen, personen, telefoonnummers, IBAN's, BSN's, postcodes, datums, identifiers en links worden lokaal en deterministisch gegenereerd. De tekst wordt pas gekopieerd nadat alle vervangers zijn ingevuld.
 
 `OTHER` wordt niet willekeurig ingevuld. Hiervoor kan optioneel een lokaal Ollama-model worden gebruikt. De app communiceert hiervoor uitsluitend met `http://localhost:11434`; er worden geen cloudmodellen of externe endpoints ondersteund. In de tweede laag kan de gebruiker het model en een gewenste formaatbeschrijving opgeven, bijvoorbeeld `intern projectnummer met prefix PROJ-`.
 

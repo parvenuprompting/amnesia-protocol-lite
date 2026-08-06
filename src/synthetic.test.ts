@@ -5,6 +5,8 @@ import {
   generateIBAN,
   hashString,
   isValidBSN,
+  parseSyntheticMarkers,
+  replaceSyntheticMarkers,
   SeededRandom,
 } from "./synthetic";
 
@@ -29,5 +31,22 @@ describe("synthetic generators", () => {
     expect(createSyntheticMap([{ type: "other", value: "interne aanduiding" }], 42)).toEqual(
       new Map(),
     );
+  });
+
+  it("parses only supported markers and replaces them without touching other text", () => {
+    const text = "Mail EMAIL_1 naar CUSTOMER_2. Laat CODE_1 ongewijzigd.";
+    expect(parseSyntheticMarkers(text)).toEqual([
+      { token: "EMAIL_1", type: "email" },
+      { token: "CUSTOMER_2", type: "customer" },
+    ]);
+    expect(
+      replaceSyntheticMarkers(
+        text,
+        new Map([
+          ["EMAIL_1", "mila@example.nl"],
+          ["CUSTOMER_2", "847291503"],
+        ]),
+      ),
+    ).toBe("Mail mila@example.nl naar 847291503. Laat CODE_1 ongewijzigd.");
   });
 });

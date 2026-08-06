@@ -91,10 +91,18 @@ test("genereert een tweede lokale synthetische laag", async ({ page }) => {
   const editor = page.getByRole("textbox", { name: "Brontekst" });
   await editor.fill("Stuur dit naar klant@example.com.");
   await page.locator(".candidate").getByRole("button", { name: "Genereer token" }).click();
+  await page.getByRole("button", { name: "Kopieer veilige tekst" }).click();
+  await expect(page.getByTestId("clipboard-status")).toHaveText(/markeringen gekopieerd/);
+  const copiedText = await page.evaluate(() => navigator.clipboard.readText());
   await page.getByRole("button", { name: "02 Synthetisch" }).click();
 
+  const sourceText = page.getByRole("textbox", { name: "Veilige tekst voor synthetische laag" });
   const syntheticText = page.getByRole("textbox", { name: "Synthetische tekst" });
-  await expect(syntheticText).not.toHaveValue("Stuur dit naar klant@example.com.");
+  await expect(sourceText).toHaveValue("");
+  await sourceText.fill(copiedText);
+  await expect(syntheticText).toHaveValue("Stuur dit naar EMAIL_1.");
+  await page.getByRole("button", { name: "Genereer standaardvervangers" }).click();
+  await expect(syntheticText).not.toHaveValue("Stuur dit naar EMAIL_1.");
   await expect(syntheticText).toHaveValue(/@/);
   await expect(page.getByText("Fictieve vervangers", { exact: false })).toBeVisible();
   await expect(page.getByText("EMAIL_1", { exact: true })).toBeVisible();

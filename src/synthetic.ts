@@ -2,6 +2,28 @@ import type { DetectionType } from "./types";
 
 export type SyntheticLocale = "nl" | "en";
 
+export type SyntheticMarker = {
+  token: string;
+  type: DetectionType;
+};
+
+const MARKER_TYPES: Record<string, DetectionType> = {
+  EMAIL: "email",
+  PHONE: "phone",
+  IBAN: "iban",
+  BSN: "bsn",
+  IP: "ip",
+  POSTCODE: "postcode",
+  DATE: "date",
+  CUSTOMER: "customer",
+  TRANSACTION: "transaction",
+  SERIAL: "serial",
+  REFERENCE: "reference",
+  PERSON: "person",
+  LINK: "link",
+  OTHER: "other",
+};
+
 const FIRST_NAMES_NL = [
   "Liam",
   "Emma",
@@ -272,4 +294,22 @@ export function createSyntheticMap(
     }
   }
   return map;
+}
+
+export function parseSyntheticMarkers(text: string): SyntheticMarker[] {
+  const markers: SyntheticMarker[] = [];
+  const seen = new Set<string>();
+  const pattern = /\b([A-Z]+)_\d+\b/g;
+  for (const match of text.matchAll(pattern)) {
+    const token = match[0];
+    const type = MARKER_TYPES[match[1]];
+    if (!type || seen.has(token)) continue;
+    seen.add(token);
+    markers.push({ token, type });
+  }
+  return markers;
+}
+
+export function replaceSyntheticMarkers(text: string, replacements: Map<string, string>): string {
+  return text.replace(/\b([A-Z]+)_\d+\b/g, (token) => replacements.get(token) ?? token);
 }

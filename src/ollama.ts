@@ -3,7 +3,7 @@ export type OllamaGenerateResponse = {
 };
 
 export async function generateWithOllama(
-  value: string,
+  marker: string,
   formatHint: string,
   model: string,
   endpoint = "http://localhost:11434/api/generate",
@@ -12,10 +12,10 @@ export async function generateWithOllama(
     ? `Gebruik dit gewenste formaat of deze beschrijving: ${formatHint.trim()}`
     : "Behoud het soort waarde en de globale vorm van het origineel.";
   const prompt = [
-    "Vervang de volgende gevoelige waarde door een realistische, volledig fictieve Nederlandse waarde.",
+    "Genereer voor de volgende marker een realistische, volledig fictieve Nederlandse waarde.",
     "Geef uitsluitend de vervangende waarde terug, zonder uitleg, aanhalingstekens of opmaak.",
     formatInstruction,
-    `Originele waarde: ${value}`,
+    `Marker: ${marker}`,
   ].join("\n");
 
   const response = await fetch(endpoint, {
