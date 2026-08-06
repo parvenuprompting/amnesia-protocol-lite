@@ -262,7 +262,7 @@ hdiutil create \
   -srcfolder "src-tauri/target/release/bundle/macos/Amnesia Protocol.app" \
   -ov \
   -format UDZO \
-  "src-tauri/target/release/bundle/dmg/Amnesia Protocol_0.2.4_aarch64.dmg"
+  "src-tauri/target/release/bundle/dmg/Amnesia Protocol_0.2.5_aarch64.dmg"
 ```
 
 ## Klembordcontrole

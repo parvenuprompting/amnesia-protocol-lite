@@ -1,6 +1,6 @@
 [package]
 name = "amnesia-protocol"
-version = "0.2.4"
+version = "0.2.5"
 description = "Local privacy review tool"
 authors = ["Amnesia Protocol"]
 edition = "2021"
