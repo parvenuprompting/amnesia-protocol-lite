@@ -16,10 +16,9 @@ describe("persistent settings", () => {
     expect(loadSettings(createStorage())).toEqual(DEFAULT_SETTINGS);
   });
 
-  it("persists model, language and clipboard preferences", () => {
+  it("persists language and clipboard preferences", () => {
     const storage = createStorage();
     const settings = {
-      preferredModel: "qwen3:4b",
       syntheticLocale: "en" as const,
       clipboardClearAfter: 30_000 as const,
     };
@@ -31,7 +30,7 @@ describe("persistent settings", () => {
     const storage = createStorage();
     storage.setItem(
       "amnesia-protocol.settings.v1",
-      JSON.stringify({ preferredModel: "", syntheticLocale: "fr", clipboardClearAfter: 123 }),
+      JSON.stringify({ syntheticLocale: "fr", clipboardClearAfter: 123 }),
     );
     expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS);
   });

@@ -1,22 +1,10 @@
-import {
-  Copy,
-  ChevronDown,
-  FileText,
-  LoaderCircle,
-  MessageSquare,
-  Send,
-  Trash2,
-  X,
-} from "lucide-react";
-import { useState } from "react";
+import { Copy, FileText, LoaderCircle, MessageSquare, Send, Trash2, X } from "lucide-react";
 import type { ChatMessage } from "./chat";
-import type { OllamaLocalModel } from "./ollama";
 
 type ChatPanelProps = {
   messages: ChatMessage[];
   input: string;
   model: string;
-  localModels: OllamaLocalModel[];
   contextAttached: boolean;
   contextLength: number;
   rateStatus: string;
@@ -28,14 +16,12 @@ type ChatPanelProps = {
   onAttachContext: () => void;
   onDetachContext: () => void;
   onCopyMessage: (content: string) => void;
-  onModelChange: (value: string) => void;
 };
 
 export function ChatPanel({
   messages,
   input,
   model,
-  localModels,
   contextAttached,
   contextLength,
   rateStatus,
@@ -47,9 +33,7 @@ export function ChatPanel({
   onAttachContext,
   onDetachContext,
   onCopyMessage,
-  onModelChange,
 }: ChatPanelProps) {
-  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   return (
     <section className="chat-workspace">
       <div className="chat-panel panel">
@@ -60,41 +44,9 @@ export function ChatPanel({
               <MessageSquare size={15} /> Lokale chat
             </span>
           </div>
-          <div className="chat-model-picker-wrap">
-            <button
-              type="button"
-              className="chat-model-button"
-              onClick={() => setModelPickerOpen((open) => !open)}
-              aria-label={`Chatmodel kiezen, huidig model ${model}`}
-              aria-expanded={modelPickerOpen}
-            >
-              {model} <ChevronDown size={13} />
-            </button>
-            {modelPickerOpen && (
-              <div className="chat-model-picker" role="listbox" aria-label="Lokale chatmodellen">
-                {localModels.length ? (
-                  localModels.map((localModel) => (
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={localModel.name === model}
-                      className={localModel.name === model ? "selected" : ""}
-                      key={localModel.name}
-                      onClick={() => {
-                        onModelChange(localModel.name);
-                        setModelPickerOpen(false);
-                      }}
-                    >
-                      {localModel.name}
-                      {localModel.parameterSize ? ` · ${localModel.parameterSize}` : ""}
-                    </button>
-                  ))
-                ) : (
-                  <span>Geen lokaal model gevonden. Open Instellingen.</span>
-                )}
-              </div>
-            )}
-          </div>
+          <span className={`chat-model-label ${model === "Geen lokaal model" ? "missing" : ""}`}>
+            {model}
+          </span>
         </div>
         <div className="chat-message-list" aria-live="polite">
           {!messages.length && (

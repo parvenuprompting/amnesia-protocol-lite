@@ -1,10 +1,14 @@
 import { Download, RefreshCw, X } from "lucide-react";
 import { CLIPBOARD_CLEAR_OPTIONS, type ClipboardClearDelay } from "./clipboard";
-import { OLLAMA_CATALOG, type OllamaLocalModel } from "./ollama";
+import {
+  FALLBACK_OLLAMA_MODEL,
+  OLLAMA_CATALOG,
+  PRIMARY_OLLAMA_MODEL,
+  type OllamaLocalModel,
+} from "./ollama";
 import type { SyntheticLocale } from "./synthetic";
 
 type SettingsPanelProps = {
-  preferredModel: string;
   syntheticLocale: SyntheticLocale;
   clipboardClearAfter: ClipboardClearDelay;
   localModels: OllamaLocalModel[];
@@ -14,7 +18,6 @@ type SettingsPanelProps = {
   pullBusy: boolean;
   pullProgress: string;
   hardwareInfo: string;
-  onPreferredModelChange: (value: string) => void;
   onLocaleChange: (value: SyntheticLocale) => void;
   onClipboardClearAfterChange: (value: ClipboardClearDelay) => void;
   onRefreshModels: () => void;
@@ -24,7 +27,6 @@ type SettingsPanelProps = {
 };
 
 export function SettingsPanel({
-  preferredModel,
   syntheticLocale,
   clipboardClearAfter,
   localModels,
@@ -34,7 +36,6 @@ export function SettingsPanel({
   pullBusy,
   pullProgress,
   hardwareInfo,
-  onPreferredModelChange,
   onLocaleChange,
   onClipboardClearAfterChange,
   onRefreshModels,
@@ -65,23 +66,32 @@ export function SettingsPanel({
 
         <section className="settings-section">
           <h3>Lokale AI</h3>
-          <label>
-            <span>Voorkeursmodel</span>
-            <select
-              value={preferredModel}
-              onChange={(event) => onPreferredModelChange(event.target.value)}
+          <div className="settings-model-status">
+            <span>Mistral</span>
+            <strong
+              className={
+                localModels.some((model) => model.name === PRIMARY_OLLAMA_MODEL)
+                  ? "available"
+                  : "missing"
+              }
             >
-              {!localModels.some((model) => model.name === preferredModel) && (
-                <option value={preferredModel}>{preferredModel} (niet lokaal gevonden)</option>
-              )}
-              {localModels.map((model) => (
-                <option key={model.name} value={model.name}>
-                  {model.name}
-                  {model.parameterSize ? ` · ${model.parameterSize}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+              {localModels.some((model) => model.name === PRIMARY_OLLAMA_MODEL)
+                ? "Lokaal beschikbaar"
+                : "Ontbreekt"}
+            </strong>
+            <span>Gemma 3 1B fallback</span>
+            <strong
+              className={
+                localModels.some((model) => model.name === FALLBACK_OLLAMA_MODEL)
+                  ? "available"
+                  : "missing"
+              }
+            >
+              {localModels.some((model) => model.name === FALLBACK_OLLAMA_MODEL)
+                ? "Lokaal beschikbaar"
+                : "Ontbreekt"}
+            </strong>
+          </div>
           <div className="settings-inline-row">
             <span className={`ollama-status ${ollamaStatus}`}>
               {ollamaStatus === "loading" && "Modellen ophalen..."}

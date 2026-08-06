@@ -69,7 +69,7 @@ test("opent instellingen vanaf de topbar", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Instellingen" }).click();
   await expect(page.getByRole("dialog", { name: "Instellingen" })).toBeVisible();
-  await expect(page.getByLabel("Voorkeursmodel")).toBeVisible();
+  await expect(page.getByText("Mistral", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Sluit instellingen" }).click();
   await expect(page.getByRole("dialog", { name: "Instellingen" })).not.toBeVisible();
 });

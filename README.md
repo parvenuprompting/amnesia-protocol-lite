@@ -27,6 +27,10 @@ De app is ontworpen voor persoonlijk gebruik op één Mac. Het doel is gecontrol
 
 ![Amnesia Protocol Synthetische Vervangers](docs/images/synthetic-screen.png)
 
+### 03 Lokale Chat
+
+![Amnesia Protocol Lokale Chat](docs/images/chat-screen.png)
+
 ## Kernprincipes
 
 - **Lokaal als standaard:** detectie, review en standaardgeneratie draaien op de Mac zonder account, cloudservice of telemetrie.
@@ -116,12 +120,12 @@ De modelcatalogus kan optioneel modellen via Ollama downloaden. Voor elke downlo
 
 Open het tandwiel in de topbar om voorkeuren te beheren. De voorkeuren worden tussen appstarts lokaal bewaard:
 
-- voorkeursmodel voor lokale AI;
+- automatisch Mistral met Gemma 3 1B als lichte fallback;
 - taal voor synthetische waarden en lokale prompts;
 - automatische clipboard-cleartimer;
 - lokale modellen verversen en nieuwe modellen downloaden.
 
-In de chat kan het model ook direct via de aanklikbare modelnaam worden gewisseld. Die keuze geldt voor het volgende antwoord; de voorkeursinstelling blijft apart beheerd in Instellingen. Alleen voorkeuren worden persistent opgeslagen. Brondata, mappings en chatgeschiedenis blijven sessiegebonden.
+In de chat toont de modelbadge welk lokaal model actief is. Mistral krijgt voorrang; Gemma 3 1B wordt automatisch gebruikt als fallback. Alleen voorkeuren worden persistent opgeslagen. Brondata, mappings en chatgeschiedenis blijven sessiegebonden.
 
 ## Technologie
 
@@ -154,10 +158,11 @@ Optionele lokale AI instellen:
 
 ```bash
 ollama serve
-ollama pull llama3.2
+ollama pull mistral
+ollama pull gemma3:1b
 ```
 
-De tweede laag gebruikt standaard het lokale model `llama3.2`. Via `Ververs lokale Ollama-modellen` kunnen geïnstalleerde modellen worden geladen. De app bevat daarnaast een kleine catalogus met modellen die optioneel via Ollama kunnen worden gedownload. Voor iedere download toont de app de geschatte omvang en aanbevolen hoeveelheid RAM en vraagt hij expliciet om bevestiging. De app gebruikt uitsluitend Ollama op `http://localhost:11434`; zonder Ollama blijven alle standaardvervangers volledig offline beschikbaar.
+De tweede laag gebruikt automatisch `mistral:latest` als primair lokaal model. Als Mistral niet beschikbaar is, valt de app terug op het lichte `gemma3:1b`-model. Via `Ververs lokale Ollama-modellen` worden alleen lokaal geïnstalleerde modellen gecontroleerd. Vanuit Instellingen kunnen Mistral of de fallback expliciet worden gedownload, met een waarschuwing voor downloadgrootte en aanbevolen RAM. De app gebruikt uitsluitend Ollama op `http://localhost:11434`; zonder Ollama blijven alle standaardvervangers volledig offline beschikbaar.
 
 Start de webontwikkelserver:
 

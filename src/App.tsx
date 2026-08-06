@@ -18,7 +18,9 @@ import {
   chatWithOllama,
   listOllamaModels,
   OLLAMA_CATALOG,
+  PRIMARY_OLLAMA_MODEL,
   pullOllamaModel,
+  resolveOllamaModel,
   type OllamaPullProgress,
 } from "./ollama";
 import { ReviewBottomBar } from "./ReviewBottomBar";
@@ -58,7 +60,6 @@ function App() {
   const [chatSentAt, setChatSentAt] = useState<number[]>([]);
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState("");
-  const [chatModel, setChatModel] = useState(settings.preferredModel);
   const [sessionSeed] = useState(() => Date.now());
   const { dialog, askConfirm, askPrompt } = useDialog();
 
@@ -84,6 +85,7 @@ function App() {
       : "RAM niet beschikbaar via macOS-webview";
     return `${cores}, ${memory}`;
   }, []);
+  const activeModel = useMemo(() => resolveOllamaModel(localModels), [localModels]);
 
   useEffect(() => {
     if (!feedbackVisible) return;
@@ -137,8 +139,8 @@ function App() {
   };
 
   const generateOther = async (entry: SyntheticEntry) => {
-    if (!settings.preferredModel.trim()) {
-      setAiError("Vul eerst de naam van een lokaal Ollama-model in.");
+    if (!activeModel) {
+      setAiError("Installeer eerst Mistral of Gemma 3 1B via Instellingen.");
       return;
     }
     setAiBusy(true);
@@ -147,7 +149,7 @@ function App() {
       const replacement = await generateWithOllama(
         entry.token,
         otherFormatHint,
-        settings.preferredModel.trim(),
+        activeModel.name,
         undefined,
         settings.syntheticLocale,
       );
@@ -168,10 +170,6 @@ function App() {
     try {
       const models = await listOllamaModels();
       setLocalModels(models);
-      if (models.length && !models.some((item) => item.name === settings.preferredModel)) {
-        updateSettings({ preferredModel: models[0].name });
-        setChatModel(models[0].name);
-      }
       setOllamaStatus("ready");
     } catch (error) {
       setOllamaStatus("error");
@@ -179,12 +177,12 @@ function App() {
         error instanceof Error ? error.message : "Lokale modellen konden niet worden opgehaald",
       );
     }
-  }, [settings.preferredModel, updateSettings]);
+  }, []);
 
   useEffect(() => {
-    if (screen !== "chat" || ollamaStatus !== "idle") return;
+    if ((!settingsOpen && screen !== "chat") || ollamaStatus !== "idle") return;
     void refreshModels();
-  }, [ollamaStatus, refreshModels, screen]);
+  }, [ollamaStatus, refreshModels, screen, settingsOpen]);
 
   const pullModel = async () => {
     const selected = OLLAMA_CATALOG.find((item) => item.name === downloadModel);
@@ -207,8 +205,6 @@ function App() {
             : "";
         setPullProgress(`${progress.status}${percentage}`);
       });
-      updateSettings({ preferredModel: downloadModel });
-      setChatModel(downloadModel);
       await refreshModels();
       showToast(`${downloadModel} is lokaal geïnstalleerd`);
     } catch (error) {
@@ -288,7 +284,7 @@ function App() {
     let answer = "";
     try {
       await chatWithOllama(
-        chatModel,
+        activeModel?.name ?? PRIMARY_OLLAMA_MODEL,
         requestMessages,
         { numCtx: CHAT_MAX_CONTEXT_TOKENS, numPredict: CHAT_MAX_OUTPUT_TOKENS },
         (progress) => {
@@ -439,9 +435,7 @@ function App() {
             <ChatPanel
               messages={chatMessages}
               input={chatInput}
-              model={chatModel}
-              localModels={localModels}
-              onModelChange={setChatModel}
+              model={activeModel?.name ?? "Geen lokaal model"}
               contextAttached={Boolean(chatContext)}
               contextLength={chatContext.length}
               rateStatus={`${chatSentAt.filter((timestamp) => Date.now() - timestamp < CHAT_RATE_WINDOW_MS).length}/${CHAT_MAX_REQUESTS_PER_WINDOW} vragen deze minuut`}
@@ -472,7 +466,6 @@ function App() {
       <AppDialog dialog={dialog} />
       {settingsOpen && (
         <SettingsPanel
-          preferredModel={settings.preferredModel}
           syntheticLocale={settings.syntheticLocale}
           clipboardClearAfter={settings.clipboardClearAfter}
           localModels={localModels}
@@ -482,10 +475,6 @@ function App() {
           pullBusy={pullBusy}
           pullProgress={pullProgress}
           hardwareInfo={hardwareInfo}
-          onPreferredModelChange={(value) => {
-            updateSettings({ preferredModel: value });
-            setChatModel(value);
-          }}
           onLocaleChange={(value) => updateSettings({ syntheticLocale: value })}
           onClipboardClearAfterChange={(value) => updateSettings({ clipboardClearAfter: value })}
           onRefreshModels={() => void refreshModels()}
