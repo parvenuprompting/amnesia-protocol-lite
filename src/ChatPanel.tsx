@@ -1,10 +1,22 @@
-import { FileText, LoaderCircle, MessageSquare, Send, Trash2, X } from "lucide-react";
+import {
+  Copy,
+  ChevronDown,
+  FileText,
+  LoaderCircle,
+  MessageSquare,
+  Send,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useState } from "react";
 import type { ChatMessage } from "./chat";
+import type { OllamaLocalModel } from "./ollama";
 
 type ChatPanelProps = {
   messages: ChatMessage[];
   input: string;
   model: string;
+  localModels: OllamaLocalModel[];
   contextAttached: boolean;
   contextLength: number;
   rateStatus: string;
@@ -15,12 +27,15 @@ type ChatPanelProps = {
   onClear: () => void;
   onAttachContext: () => void;
   onDetachContext: () => void;
+  onCopyMessage: (content: string) => void;
+  onModelChange: (value: string) => void;
 };
 
 export function ChatPanel({
   messages,
   input,
   model,
+  localModels,
   contextAttached,
   contextLength,
   rateStatus,
@@ -31,7 +46,10 @@ export function ChatPanel({
   onClear,
   onAttachContext,
   onDetachContext,
+  onCopyMessage,
+  onModelChange,
 }: ChatPanelProps) {
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   return (
     <section className="chat-workspace">
       <div className="chat-panel panel">
@@ -39,10 +57,44 @@ export function ChatPanel({
           <div>
             <span className="panel-kicker">LOKALE CHAT</span>
             <span className="panel-title">
-              <MessageSquare size={15} /> Vraag het lokale model
+              <MessageSquare size={15} /> Lokale chat
             </span>
           </div>
-          <span className="chat-model-label">{model}</span>
+          <div className="chat-model-picker-wrap">
+            <button
+              type="button"
+              className="chat-model-button"
+              onClick={() => setModelPickerOpen((open) => !open)}
+              aria-label={`Chatmodel kiezen, huidig model ${model}`}
+              aria-expanded={modelPickerOpen}
+            >
+              {model} <ChevronDown size={13} />
+            </button>
+            {modelPickerOpen && (
+              <div className="chat-model-picker" role="listbox" aria-label="Lokale chatmodellen">
+                {localModels.length ? (
+                  localModels.map((localModel) => (
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={localModel.name === model}
+                      className={localModel.name === model ? "selected" : ""}
+                      key={localModel.name}
+                      onClick={() => {
+                        onModelChange(localModel.name);
+                        setModelPickerOpen(false);
+                      }}
+                    >
+                      {localModel.name}
+                      {localModel.parameterSize ? ` · ${localModel.parameterSize}` : ""}
+                    </button>
+                  ))
+                ) : (
+                  <span>Geen lokaal model gevonden. Open Instellingen.</span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         <div className="chat-message-list" aria-live="polite">
           {!messages.length && (
@@ -55,7 +107,20 @@ export function ChatPanel({
           {messages.map((message, index) => (
             <article className={`chat-message ${message.role}`} key={`${message.role}-${index}`}>
               <span className="chat-role">{message.role === "user" ? "JIJ" : "LOKAAL MODEL"}</span>
-              <p>{message.content}</p>
+              <div className="chat-message-content">
+                <p>{message.content}</p>
+                {message.role === "assistant" && message.content && (
+                  <button
+                    type="button"
+                    className="icon-button chat-copy-button"
+                    onClick={() => onCopyMessage(message.content)}
+                    aria-label="Kopieer chatbotantwoord"
+                    title="Kopieer chatbotantwoord"
+                  >
+                    <Copy size={14} />
+                  </button>
+                )}
+              </div>
             </article>
           ))}
           {busy && (

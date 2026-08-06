@@ -2,9 +2,10 @@ import { ShieldCheck, Sparkles } from "lucide-react";
 
 type HomeScreenProps = {
   onStart: () => void;
+  onStartChat: () => void;
 };
 
-export function HomeScreen({ onStart }: HomeScreenProps) {
+export function HomeScreen({ onStart, onStartChat }: HomeScreenProps) {
   return (
     <section className="home-screen">
       <div className="home-copy">
@@ -19,9 +20,14 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
           tekst een ander venster of een externe dienst bereikt. Alles blijft lokaal en de
           pseudoniem-mapping bestaat alleen zolang deze sessie open is.
         </p>
-        <button className="start-button" type="button" onClick={onStart}>
-          Start een nieuwe controle <Sparkles size={17} />
-        </button>
+        <div className="home-actions">
+          <button className="start-button" type="button" onClick={onStart}>
+            Start een nieuwe controle <Sparkles size={17} />
+          </button>
+          <button className="chat-start-button" type="button" onClick={onStartChat}>
+            Start lokale chat <Sparkles size={16} />
+          </button>
+        </div>
       </div>
       <div className="home-aside">
         <div className="home-shield">

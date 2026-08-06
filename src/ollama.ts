@@ -11,6 +11,17 @@ export type OllamaLocalModel = {
   parameterSize?: string;
 };
 
+async function ollamaHttpError(response: Response): Promise<Error> {
+  const body = await response.text();
+  try {
+    const payload = JSON.parse(body) as { error?: string };
+    if (payload.error) return new Error(`Ollama: ${payload.error}`);
+  } catch {
+    // Keep the HTTP status when Ollama did not return JSON.
+  }
+  return new Error(`Ollama antwoordde met HTTP ${response.status}`);
+}
+
 export type OllamaPullProgress = {
   status: string;
   completed?: number;
@@ -86,7 +97,7 @@ export async function generateWithOllama(
   });
 
   if (!response.ok) {
-    throw new Error(`Ollama antwoordde met HTTP ${response.status}`);
+    throw await ollamaHttpError(response);
   }
 
   const payload = (await response.json()) as OllamaGenerateResponse;
@@ -105,12 +116,17 @@ export async function listOllamaModels(
     throw new Error(`Ollama antwoordde met HTTP ${response.status}`);
   }
   const payload = (await response.json()) as {
-    models?: Array<{ name?: string; size?: number; details?: { parameter_size?: string } }>;
+    models?: Array<{
+      name?: string;
+      size?: number;
+      remote_host?: string;
+      details?: { parameter_size?: string };
+    }>;
   };
   return (payload.models ?? [])
     .filter(
       (model): model is { name: string; size?: number; details?: { parameter_size?: string } } =>
-        Boolean(model.name),
+        Boolean(model.name) && !model.remote_host,
     )
     .map((model) => ({
       name: model.name,
@@ -129,7 +145,7 @@ export async function pullOllamaModel(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model, stream: true }),
   });
-  if (!response.ok) throw new Error(`Ollama antwoordde met HTTP ${response.status}`);
+  if (!response.ok) throw await ollamaHttpError(response);
   if (!response.body) return;
 
   const reader = response.body.getReader();
@@ -171,7 +187,7 @@ export async function chatWithOllama(
       },
     }),
   });
-  if (!response.ok) throw new Error(`Ollama antwoordde met HTTP ${response.status}`);
+  if (!response.ok) throw await ollamaHttpError(response);
   if (!response.body) return "";
 
   const reader = response.body.getReader();

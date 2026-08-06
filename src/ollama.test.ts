@@ -41,7 +41,10 @@ describe("generateWithOllama", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
         JSON.stringify({
-          models: [{ name: "llama3.2", size: 2_000_000_000, details: { parameter_size: "3B" } }],
+          models: [
+            { name: "llama3.2", size: 2_000_000_000, details: { parameter_size: "3B" } },
+            { name: "cloud-model:cloud", remote_host: "https://ollama.com:443" },
+          ],
         }),
         { status: 200 },
       ),
@@ -93,5 +96,18 @@ describe("generateWithOllama", () => {
       ),
     ).resolves.toBe("Hallo wereld");
     expect(chunks).toEqual(["Hallo", " wereld"]);
+  });
+
+  it("preserves the Ollama error when a model is missing", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "model 'llama3.2' not found" }), { status: 404 }),
+    );
+
+    await expect(
+      chatWithOllama("llama3.2", [{ role: "user", content: "Hallo" }], {
+        numCtx: 4000,
+        numPredict: 512,
+      }),
+    ).rejects.toThrow("model 'llama3.2' not found");
   });
 });
