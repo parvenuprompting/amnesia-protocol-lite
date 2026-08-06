@@ -460,7 +460,7 @@ function App() {
             <ChatPanel
               messages={chatMessages}
               input={chatInput}
-              model={activeModel?.name ?? "Geen lokaal model"}
+              model={activeModel?.label ?? "Geen lokaal model"}
               contextAttached={Boolean(chatContext)}
               contextLength={chatContext.length}
               rateStatus={`${chatSentAt.filter((timestamp) => Date.now() - timestamp < CHAT_RATE_WINDOW_MS).length}/${CHAT_MAX_REQUESTS_PER_WINDOW} vragen deze minuut`}
