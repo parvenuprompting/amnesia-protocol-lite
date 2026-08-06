@@ -29,6 +29,7 @@ export function HomeScreen({ onStart, onStartChat, onStartTerminal }: HomeScreen
           <button className="chat-start-button" type="button" onClick={onStartChat}>
             Start lokale chat <Sparkles size={16} />
           </button>
+          <span className="home-chat-note">Chat vereist een lokaal Ollama-model</span>
           <button className="terminal-start-button" type="button" onClick={onStartTerminal}>
             Terminal <Sparkles size={16} />
           </button>

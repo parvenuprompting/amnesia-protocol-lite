@@ -179,8 +179,8 @@ export function SettingsPanel({
         </section>
 
         <p className="settings-note">
-          Alleen deze voorkeuren worden lokaal bewaard. Brondata, mappings en chatgeschiedenis
-          blijven sessiegebonden.
+          Alleen deze voorkeuren worden lokaal in deze app bewaard via localStorage. Brondata,
+          mappings en chatgeschiedenis blijven sessiegebonden.
         </p>
       </aside>
     </div>

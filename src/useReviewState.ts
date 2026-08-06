@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
-import { detect } from "./detectors";
+import { detect, MAX_DETECTION_INPUT_LENGTH } from "./detectors";
 import { htmlToPlainText, insertTextAtSelection } from "./html";
 import {
   applyAction,
@@ -53,15 +53,24 @@ export function useReviewState({
   const [selectedType, setSelectedType] = useState<DetectionType>("person");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textEditVersionRef = useRef(0);
+  const maxHistoryEntries = 50;
+
+  const pushHistory = (snapshot: ReviewSnapshot) => {
+    setHistory((items) => [...items, snapshot].slice(-maxHistoryEntries));
+  };
 
   useEffect(() => {
     if (!textEditBaseline) return;
     const version = textEditVersionRef.current;
     const timeout = window.setTimeout(() => {
       if (version !== textEditVersionRef.current) return;
-      setHistory((items) => [...items, textEditBaseline]);
+      pushHistory(textEditBaseline);
       setFuture([]);
-      setDetections(mergeDetections(textEditBaseline.detections, detectText(text), text));
+      try {
+        setDetections(mergeDetections(textEditBaseline.detections, detectText(text), text));
+      } catch (error) {
+        onToast(error instanceof Error ? error.message : "Detectie mislukt");
+      }
       setTextEditBaseline(null);
       onToast("Nieuwe tekst gedetecteerd");
     }, 200);
@@ -75,7 +84,7 @@ export function useReviewState({
 
   const commitDetections = (next: Detection[]) => {
     textEditVersionRef.current += 1;
-    setHistory((items) => [...items, textEditBaseline ?? { text, detections }]);
+    pushHistory(textEditBaseline ?? { text, detections });
     setFuture([]);
     setTextEditBaseline(null);
     setDetections(next);
@@ -86,6 +95,12 @@ export function useReviewState({
   };
 
   const onTextChange = (value: string) => {
+    if (value.length > MAX_DETECTION_INPUT_LENGTH) {
+      onToast(
+        `Tekst is te groot. Maximum is ${MAX_DETECTION_INPUT_LENGTH.toLocaleString("nl-NL")} tekens.`,
+      );
+      return;
+    }
     textEditVersionRef.current += 1;
     if (!textEditBaseline) setTextEditBaseline({ text, detections });
     setText(value);
@@ -138,7 +153,7 @@ export function useReviewState({
     }
     const previous = history.at(-1);
     if (!previous) return;
-    setFuture((items) => [...items, { text, detections }]);
+    setFuture((items) => [...items, { text, detections }].slice(-maxHistoryEntries));
     setText(previous.text);
     setDetections(previous.detections);
     setTextEditBaseline(null);
@@ -149,7 +164,7 @@ export function useReviewState({
   const redo = () => {
     const next = future.at(-1);
     if (!next) return;
-    setHistory((items) => [...items, { text, detections }]);
+    pushHistory({ text, detections });
     setText(next.text);
     setDetections(next.detections);
     setTextEditBaseline(null);

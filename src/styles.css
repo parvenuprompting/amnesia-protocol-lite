@@ -260,6 +260,11 @@ button:disabled {
 .terminal-start-button:hover {
   background: #e3e0d7;
 }
+.home-chat-note {
+  flex-basis: 100%;
+  color: #9a958a;
+  font-size: 10px;
+}
 .start-button:hover {
   background: #4b4a43;
   transform: translateY(-1px);

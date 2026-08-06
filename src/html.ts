@@ -52,6 +52,12 @@ function extractText(node: Node): string {
   if (tag === "script" || tag === "style" || tag === "noscript") {
     return "";
   }
+  if (tag === "td" || tag === "th") {
+    return `${Array.from(element.childNodes, extractText).join("")}\t`;
+  }
+  if (tag === "tr") {
+    return `${Array.from(element.childNodes, extractText).join("").replace(/\t$/, "")}\n`;
+  }
   const isBlock = blockTags.has(tag);
   let result = isBlock ? "\n" : "";
   element.childNodes.forEach((child) => {

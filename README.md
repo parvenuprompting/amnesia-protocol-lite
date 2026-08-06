@@ -1,6 +1,6 @@
 # Amnesia Protocol Lite
 
-[![Version](https://img.shields.io/badge/Version-v0.2.5-aa7651?style=flat-square)](#status)
+[![Version](https://img.shields.io/badge/Version-v0.2.6-aa7651?style=flat-square)](#status)
 [![Offline-first](https://img.shields.io/badge/Privacy-offline--first-637157?style=flat-square)](#privacy-en-beveiliging)
 [![Zero Cloud](https://img.shields.io/badge/Telemetry-Zero%20%2F%20No%20Tracking-2e532b?style=flat-square)](#privacy-en-beveiliging)
 [![Local AI](https://img.shields.io/badge/AI-local%20Ollama-c9a957?style=flat-square)](#synthetische-tweede-laag)
@@ -261,7 +261,7 @@ hdiutil create \
   -srcfolder "src-tauri/target/release/bundle/macos/Amnesia Protocol.app" \
   -ov \
   -format UDZO \
-  "src-tauri/target/release/bundle/dmg/Amnesia Protocol_0.2.5_aarch64.dmg"
+  "src-tauri/target/release/bundle/dmg/Amnesia Protocol_0.2.6_aarch64.dmg"
 ```
 
 ## Klembordcontrole
@@ -276,7 +276,7 @@ De browser-e2e-tests geven Playwright expliciete klembordrechten en controleren 
 
 Zolang je de app lokaal gebruikt, blijft de normale verwerking op je Mac. De detectoren werken lokaal, de review gebeurt lokaal en de mapping leeft alleen in het geheugen van deze sessie. De tweede laag ontvangt alleen de tekst die je zelf kopieert en plakt; de oorspronkelijke bronmapping wordt niet automatisch doorgegeven. De optionele AI-functies praten uitsluitend met Ollama op `localhost`.
 
-Er is geen account, backend, analytics of telemetrie. De app voert geen Terminal-commando's uit en leest geen Terminalvensters automatisch; Terminaldata wordt alleen verwerkt nadat je die zelf plakt. Alleen niet-gevoelige voorkeuren zoals taal, modelbeleid en clipboardtimer worden lokaal tussen appstarts bewaard.
+Er is geen account, backend, analytics of telemetrie. De app voert geen Terminal-commando's uit en leest geen Terminalvensters automatisch; Terminaldata wordt alleen verwerkt nadat je die zelf plakt. Alleen niet-gevoelige voorkeuren zoals taal, modelbeleid en clipboardtimer worden via `localStorage` lokaal tussen appstarts bewaard.
 
 FileVault beschermt de Mac op schijfniveau. De app gebruikt in deze versie geen extra encryptielaag omdat de mapping niet persistent wordt opgeslagen. De brondata en mapping leven tijdens gebruik wel tijdelijk in het geheugen van de applicatie.
 
@@ -290,6 +290,8 @@ Let op:
 ## Bekende beperkingen
 
 - Namen zonder duidelijke context worden niet algemeen via NER gedetecteerd. Handmatig markeren blijft nodig voor veel namen.
+- Invoer is begrensd op 1.000.000 tekens en undo/redo bewaart maximaal 50 snapshots om geheugenverbruik te begrenzen.
+- HTML-tabellen worden als tekst met tabs en regels ingevoegd; complexe visuele styling wordt niet behouden.
 - Overlapresolutie is bewust eenvoudig en gericht op korte geplakte teksten. Bij complexe meervoudige overlaps kan menselijke controle nodig zijn.
 - PDF, DOCX, OCR, CSV-structuurbehoud en bestandsimport/export zijn nog geen onderdeel van deze MVP.
 - Persistente mapping tussen sessies is uitgesteld tot daar een concreet gebruiksmoment voor bestaat.
@@ -326,4 +328,4 @@ src-tauri/
 
 ## Status
 
-De huidige implementatie bevat de Fase 1/2-MVP plus Terminal-opschoning en een lokale chatlaag: lokale review, detectie van Terminal-secrets en accountpaden, uitgebreide Nederlandse detectieregels, sessiegebonden pseudonimisering, een onafhankelijk geplakte synthetische tweede laag, Engelse synthetische waarden, optionele lokale Ollama-AI, lokale modeldownloads met hardwarewaarschuwing, clipboardcontrole, snapshot-history, gescheiden veilige en geforceerde bulkacties, debounce voor langere teksten en een begrensde lokale chat. De tests en productiebuild moeten groen zijn voordat wijzigingen als afgerond worden beschouwd.
+De huidige implementatie bevat de Fase 1/2-MVP plus Terminal-opschoning en een lokale chatlaag: lokale review, detectie van Terminal-secrets en accountpaden, uitgebreide Nederlandse detectieregels, sessiegebonden pseudonimisering, een onafhankelijk geplakte synthetische tweede laag, Engelse synthetische waarden, optionele lokale Ollama-AI met timeouts en outputnormalisatie, lokale modeldownloads met hardwarewaarschuwing, clipboardcontrole, begrensde snapshot-history, gescheiden veilige en geforceerde bulkacties, debounce voor langere teksten en een begrensde lokale chat. De tests en productiebuild moeten groen zijn voordat wijzigingen als afgerond worden beschouwd.

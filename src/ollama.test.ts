@@ -5,6 +5,7 @@ import {
   listOllamaModels,
   pullOllamaModel,
   resolveOllamaModel,
+  normalizeGeneratedValue,
 } from "./ollama";
 
 describe("generateWithOllama", () => {
@@ -115,6 +116,15 @@ describe("generateWithOllama", () => {
         numPredict: 512,
       }),
     ).rejects.toThrow("model 'llama3.2' not found");
+  });
+
+  it("normalizes explanatory and fenced OTHER responses", () => {
+    expect(normalizeGeneratedValue("Hier is de waarde: `PROJ-4821`\nGebruik deze waarde.")).toBe(
+      "PROJ-4821",
+    );
+    expect(normalizeGeneratedValue("```text\nfictional@example.com\n``` ")).toBe(
+      "fictional@example.com",
+    );
   });
 
   it("accepts Dolphin Mistral as a primary Mistral-family model", () => {
