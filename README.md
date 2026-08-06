@@ -95,9 +95,9 @@ Dezelfde waarde krijgt binnen één actieve sessie hetzelfde token. Bij het slui
 
 ## Synthetische tweede laag
 
-In tabblad `02 Synthetisch` plakt de gebruiker eerst zelf de veilige tekst uit laag 1. Alleen ondersteunde markers zoals `EMAIL_1`, `CUSTOMER_1` en `LINK_1` worden herkend; de tweede laag ontvangt geen bronwaarden uit de eerste laag. Na een expliciete klik worden de markers opnieuw opgebouwd als realistische, volledig fictieve Nederlandse waarden. E-mailadressen, personen, telefoonnummers, IBAN's, BSN's, postcodes, datums, identifiers en links worden lokaal en deterministisch gegenereerd. De tekst wordt pas gekopieerd nadat alle vervangers zijn ingevuld.
+In tabblad `02 Synthetisch` plakt de gebruiker eerst zelf de veilige tekst uit laag 1. Alleen ondersteunde markers zoals `EMAIL_1`, `CUSTOMER_1` en `LINK_1` worden herkend; de tweede laag ontvangt geen bronwaarden uit de eerste laag. Na een expliciete klik worden de markers opnieuw opgebouwd als realistische, volledig fictieve waarden. Kies in de synthetische laag Nederlands of English. E-mailadressen, personen, telefoonnummers, IBAN's, BSN's, postcodes, datums, identifiers en links worden lokaal en deterministisch gegenereerd. De tekst wordt pas gekopieerd nadat alle vervangers zijn ingevuld.
 
-`OTHER` wordt niet willekeurig ingevuld. Hiervoor kan optioneel een lokaal Ollama-model worden gebruikt. De app communiceert hiervoor uitsluitend met `http://localhost:11434`; er worden geen cloudmodellen of externe endpoints ondersteund. In de tweede laag kan de gebruiker het model en een gewenste formaatbeschrijving opgeven, bijvoorbeeld `intern projectnummer met prefix PROJ-`.
+`OTHER` wordt niet willekeurig ingevuld. Hiervoor kan optioneel een lokaal Ollama-model worden gebruikt. De app communiceert hiervoor uitsluitend met `http://localhost:11434`; er worden geen cloudmodellen of externe endpoints ondersteund. De gekozen taal wordt ook aan de lokale prompt meegegeven. In de tweede laag kan de gebruiker het model en een gewenste formaatbeschrijving opgeven, bijvoorbeeld `intern projectnummer met prefix PROJ-`.
 
 ## Technologie
 
@@ -227,6 +227,8 @@ src/
   ReviewBottomBar.tsx Reviewacties en clipboardknoppen
   AppDialog.tsx       Modalweergave en focusbeheer
   useDialog.ts        Confirm- en promptlogica
+  useReviewState.ts   Debounced detectie, history en reviewacties
+  useClipboard.ts     Clipboardstatus en readback-verificatie
   SyntheticPanel.tsx  Tweede laag voor geplakte markers
   detectors.ts        Lokale detectoren, contextregels en checksums
   synthetic.ts        Markerparser en fictieve datageneratoren
@@ -243,4 +245,4 @@ src-tauri/
 
 ## Status
 
-De huidige implementatie bevat de Fase 1/2-MVP: lokale review, uitgebreide Nederlandse detectieregels, sessiegebonden pseudonimisering, een onafhankelijk geplakte synthetische tweede laag, optionele lokale Ollama-AI, klembordcontrole, snapshot-history en gescheiden veilige en geforceerde bulkacties. De tests en productiebuild moeten groen zijn voordat wijzigingen als afgerond worden beschouwd.
+De huidige implementatie bevat de Fase 1/2-MVP: lokale review, uitgebreide Nederlandse detectieregels, sessiegebonden pseudonimisering, een onafhankelijk geplakte synthetische tweede laag, optionele lokale Ollama-AI, klembordcontrole, snapshot-history, gescheiden veilige en geforceerde bulkacties en debounce voor langere teksten. De tests en productiebuild moeten groen zijn voordat wijzigingen als afgerond worden beschouwd.

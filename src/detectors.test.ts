@@ -81,6 +81,18 @@ describe("detectors", () => {
       ["link", "http://test.org"],
     ]);
   });
+
+  it("handles long text while detecting a value near the end", () => {
+    const text = `${"Geen gevoelige informatie. ".repeat(2000)} klant@example.com`;
+    const start = performance.now();
+    const result = detect(text);
+    const duration = performance.now() - start;
+
+    expect(result.some((item) => item.type === "email" && item.value === "klant@example.com")).toBe(
+      true,
+    );
+    expect(duration).toBeLessThan(1000);
+  });
   it("detects all sensitive entities in Dutch customer service document", () => {
     const doc = [
       "afzender Voorbeeld B.V.",

@@ -23,4 +23,17 @@ describe("generateWithOllama", () => {
     expect(request.prompt).toContain("PROJ-");
     expect(request.prompt).not.toContain("klant@example.com");
   });
+
+  it("uses the selected English language in the local prompt", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify({ response: "Fictional Project" }), { status: 200 }),
+      );
+
+    await generateWithOllama("OTHER_1", "fictional project name", "llama3.2", undefined, "en");
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+
+    expect(request.prompt).toContain("in English");
+  });
 });

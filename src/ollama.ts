@@ -1,3 +1,5 @@
+import type { SyntheticLocale } from "./synthetic";
+
 export type OllamaGenerateResponse = {
   response?: string;
 };
@@ -7,12 +9,14 @@ export async function generateWithOllama(
   formatHint: string,
   model: string,
   endpoint = "http://localhost:11434/api/generate",
+  locale: SyntheticLocale = "nl",
 ): Promise<string> {
+  const language = locale === "en" ? "English" : "Nederlands";
   const formatInstruction = formatHint.trim()
     ? `Gebruik dit gewenste formaat of deze beschrijving: ${formatHint.trim()}`
     : "Behoud het soort waarde en de globale vorm van het origineel.";
   const prompt = [
-    "Genereer voor de volgende marker een realistische, volledig fictieve Nederlandse waarde.",
+    `Genereer voor de volgende marker een realistische, volledig fictieve waarde in ${language}.`,
     "Geef uitsluitend de vervangende waarde terug, zonder uitleg, aanhalingstekens of opmaak.",
     formatInstruction,
     `Marker: ${marker}`,

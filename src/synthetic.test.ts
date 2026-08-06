@@ -52,4 +52,22 @@ describe("synthetic generators", () => {
       ),
     ).toBe("Mail mila@example.nl naar 847291503 op Lindelaan 42. Laat CODE_1 ongewijzigd.");
   });
+
+  it("generates English values when the locale is selected", () => {
+    const values = createSyntheticMap(
+      [
+        { type: "person" as const, value: "PERSON_1" },
+        { type: "email" as const, value: "EMAIL_1" },
+        { type: "link" as const, value: "LINK_1" },
+      ],
+      42,
+      "en",
+    );
+
+    expect(values.get("PERSON_1")).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
+    expect(values.get("EMAIL_1")).toMatch(
+      /@(example\.com|fictional\.co\.uk|demo-org\.com|sample\.net|test-company\.co\.uk)$/,
+    );
+    expect(values.get("LINK_1")).toMatch(/^https:\/\/www\./);
+  });
 });

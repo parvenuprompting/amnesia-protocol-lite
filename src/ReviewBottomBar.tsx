@@ -1,11 +1,8 @@
 import { Clipboard, Sparkles } from "lucide-react";
+import type { ClipboardStatus } from "./clipboard";
 import type { DetectionType } from "./types";
 
-export type ClipboardStatus =
-  | { state: "idle" }
-  | { state: "copying" }
-  | { state: "success"; message: string }
-  | { state: "error"; message: string };
+export type { ClipboardStatus } from "./clipboard";
 
 type ReviewBottomBarProps = {
   typeOptions: [DetectionType, string][];

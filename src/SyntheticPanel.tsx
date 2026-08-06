@@ -1,4 +1,5 @@
 import { Clipboard, RefreshCw, Sparkles } from "lucide-react";
+import type { SyntheticLocale } from "./synthetic";
 import type { DetectionType } from "./types";
 import { TYPE_LABELS } from "./types";
 
@@ -15,11 +16,13 @@ type SyntheticPanelProps = {
   sourceText: string;
   syntheticText: string;
   model: string;
+  locale: SyntheticLocale;
   formatHint: string;
   aiBusy: boolean;
   aiError: string;
   onSourceTextChange: (value: string) => void;
   onModelChange: (value: string) => void;
+  onLocaleChange: (value: SyntheticLocale) => void;
   onFormatHintChange: (value: string) => void;
   onGenerateAll: () => void;
   onGenerateOther: (entry: SyntheticEntry) => void;
@@ -32,11 +35,13 @@ export function SyntheticPanel({
   sourceText,
   syntheticText,
   model,
+  locale,
   formatHint,
   aiBusy,
   aiError,
   onSourceTextChange,
   onModelChange,
+  onLocaleChange,
   onFormatHintChange,
   onGenerateAll,
   onGenerateOther,
@@ -93,6 +98,17 @@ export function SyntheticPanel({
         </div>
 
         <div className="synthetic-controls">
+          <label>
+            <span>Taal voor fictieve waarden</span>
+            <select
+              aria-label="Taal voor fictieve waarden"
+              value={locale}
+              onChange={(event) => onLocaleChange(event.target.value as SyntheticLocale)}
+            >
+              <option value="nl">Nederlands</option>
+              <option value="en">English</option>
+            </select>
+          </label>
           <label>
             <span>Ollama-model voor Overig</span>
             <input

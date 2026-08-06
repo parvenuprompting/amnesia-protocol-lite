@@ -99,6 +99,82 @@ const CITIES_NL = [
 
 const DOMAINS_NL = ["voorbeeld.nl", "fictief.nl", "demo-org.nl", "example.nl", "testbedrijf.nl"];
 
+const FIRST_NAMES_EN = [
+  "Oliver",
+  "Amelia",
+  "George",
+  "Isla",
+  "Harry",
+  "Emily",
+  "Jack",
+  "Ava",
+  "Noah",
+  "Isabella",
+  "Arthur",
+  "Mia",
+  "Leo",
+  "Grace",
+  "Oscar",
+  "Lily",
+  "Henry",
+  "Ella",
+  "Charlie",
+  "Sophie",
+];
+
+const LAST_NAMES_EN = [
+  "Smith",
+  "Jones",
+  "Taylor",
+  "Brown",
+  "Davies",
+  "Wilson",
+  "Evans",
+  "Thomas",
+  "Roberts",
+  "Johnson",
+  "Lewis",
+  "Walker",
+  "Robinson",
+  "Wood",
+  "Thompson",
+  "White",
+  "Watson",
+  "Wright",
+];
+
+const STREET_NAMES_EN = [
+  "Baker Street",
+  "King Street",
+  "Church Road",
+  "Victoria Road",
+  "Station Road",
+  "Park Lane",
+  "High Street",
+  "Mill Road",
+  "Queen Street",
+  "Oak Avenue",
+];
+
+const CITIES_EN = [
+  "London",
+  "Manchester",
+  "Birmingham",
+  "Leeds",
+  "Bristol",
+  "Liverpool",
+  "Oxford",
+  "Cambridge",
+];
+
+const DOMAINS_EN = [
+  "example.com",
+  "fictional.co.uk",
+  "demo-org.com",
+  "sample.net",
+  "test-company.co.uk",
+];
+
 const LINK_PATHS = [
   "/mijn-account",
   "/factuur/2026/07",
@@ -106,6 +182,15 @@ const LINK_PATHS = [
   "/diensten/onderhoud",
   "/leden/123456",
   "/documenten/afschrift",
+];
+
+const LINK_PATHS_EN = [
+  "/my-account",
+  "/invoice/2026/07",
+  "/contact",
+  "/services/maintenance",
+  "/members/123456",
+  "/documents/statement",
 ];
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -190,31 +275,35 @@ export function generateIBAN(rng: SeededRandom): string {
   return `${iban.slice(0, 4)} ${iban.slice(4, 8)} ${iban.slice(8, 12)} ${iban.slice(12, 16)} ${iban.slice(16, 18)}`;
 }
 
-function formatPostcode(rng: SeededRandom): string {
+function formatPostcode(rng: SeededRandom, locale: SyntheticLocale): string {
+  if (locale === "en") return rng.digits(5);
   const digits = rng.digits(4);
   const letters = rng.chars(2).replace(/O/g, "P");
   return `${digits} ${letters}`;
 }
 
-function formatAddress(rng: SeededRandom): string {
-  return `${rng.pick(STREET_NAMES_NL)} ${rng.int(1, 198)}`;
+function formatAddress(rng: SeededRandom, locale: SyntheticLocale): string {
+  const streets = locale === "en" ? STREET_NAMES_EN : STREET_NAMES_NL;
+  return `${rng.pick(streets)} ${rng.int(1, 198)}`;
 }
 
-function formatPostcodeWithCity(rng: SeededRandom): string {
-  return `${formatPostcode(rng)} ${rng.pick(CITIES_NL)}`;
+function formatPostcodeWithCity(rng: SeededRandom, locale: SyntheticLocale): string {
+  const cities = locale === "en" ? CITIES_EN : CITIES_NL;
+  return `${formatPostcode(rng, locale)} ${rng.pick(cities)}`;
 }
 
-function formatPhone(rng: SeededRandom): string {
+function formatPhone(rng: SeededRandom, locale: SyntheticLocale): string {
   const number = rng.int(10000000, 99999999);
   const str = String(number);
+  if (locale === "en") return `+1 202 ${str.slice(0, 3)} ${str.slice(3, 7)}`;
   return `06 ${str.slice(0, 2)} ${str.slice(2, 4)} ${str.slice(4, 6)} ${str.slice(6, 8)}`;
 }
 
-function formatDate(rng: SeededRandom): string {
+function formatDate(rng: SeededRandom, locale: SyntheticLocale): string {
   const start = new Date(2020, 0, 1).getTime();
   const end = new Date(2030, 11, 31).getTime();
   const timestamp = start + Math.floor(rng.next() * (end - start));
-  return new Date(timestamp).toLocaleDateString("nl-NL", {
+  return new Date(timestamp).toLocaleDateString(locale === "en" ? "en-GB" : "nl-NL", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -225,24 +314,28 @@ export function generateSyntheticValue(
   type: DetectionType,
   value: string,
   rng: SeededRandom,
+  locale: SyntheticLocale = "nl",
 ): string | null {
+  const firstNames = locale === "en" ? FIRST_NAMES_EN : FIRST_NAMES_NL;
+  const lastNames = locale === "en" ? LAST_NAMES_EN : LAST_NAMES_NL;
+  const domains = locale === "en" ? DOMAINS_EN : DOMAINS_NL;
   switch (type) {
     case "person": {
-      const first = rng.pick(FIRST_NAMES_NL);
-      const last = rng.pick(LAST_NAMES_NL);
+      const first = rng.pick(firstNames);
+      const last = rng.pick(lastNames);
       if (value.includes(".")) {
         return `${first.charAt(0)}. ${last}`;
       }
       return `${first} ${last}`;
     }
     case "email": {
-      const first = rng.pick(FIRST_NAMES_NL).toLowerCase();
-      const last = rng.pick(LAST_NAMES_NL).toLowerCase().replace(/\s+/g, ".");
-      const domain = rng.pick(DOMAINS_NL);
+      const first = rng.pick(firstNames).toLowerCase();
+      const last = rng.pick(lastNames).toLowerCase().replace(/\s+/g, ".");
+      const domain = rng.pick(domains);
       return `${first}.${last}@${domain}`;
     }
     case "phone":
-      return formatPhone(rng);
+      return formatPhone(rng, locale);
     case "iban":
       return generateIBAN(rng);
     case "bsn":
@@ -251,16 +344,16 @@ export function generateSyntheticValue(
       return `10.${rng.int(0, 255)}.${rng.int(0, 255)}.${rng.int(0, 255)}`;
     case "postcode":
       if (/[A-Za-z].*\d/.test(value) && !/^\d{4}/.test(value.trim())) {
-        return formatAddress(rng);
+        return formatAddress(rng, locale);
       }
       if (/^\d{4}\s?[A-Z]{2}\s+/i.test(value.trim())) {
-        return formatPostcodeWithCity(rng);
+        return formatPostcodeWithCity(rng, locale);
       }
-      return formatPostcode(rng);
+      return formatPostcode(rng, locale);
     case "address":
-      return formatAddress(rng);
+      return formatAddress(rng, locale);
     case "date":
-      return formatDate(rng);
+      return formatDate(rng, locale);
     case "customer":
       return rng.digits(9);
     case "transaction":
@@ -270,8 +363,8 @@ export function generateSyntheticValue(
     case "reference":
       return `${rng.digits(2)}.${rng.digits(3)}.${rng.digits(3)}`;
     case "link": {
-      const domain = rng.pick(DOMAINS_NL).replace(/^www\./, "");
-      const path = rng.pick(LINK_PATHS);
+      const domain = rng.pick(domains).replace(/^www\./, "");
+      const path = rng.pick(locale === "en" ? LINK_PATHS_EN : LINK_PATHS);
       return `https://www.${domain}${path}`;
     }
     case "other":
@@ -284,14 +377,15 @@ export function generateSyntheticValue(
 export function createSyntheticMap(
   values: Iterable<{ type: DetectionType; value: string }>,
   sessionSeed?: number,
+  locale: SyntheticLocale = "nl",
 ): Map<string, string> {
   const seed = sessionSeed ?? Date.now();
   const map = new Map<string, string>();
   for (const { type, value } of values) {
     if (type === "other" || map.has(value)) continue;
-    const itemSeed = hashString(`${type}:${value}:${seed}`);
+    const itemSeed = hashString(`${type}:${value}:${seed}:${locale}`);
     const rng = new SeededRandom(itemSeed);
-    const synthetic = generateSyntheticValue(type, value, rng);
+    const synthetic = generateSyntheticValue(type, value, rng, locale);
     if (synthetic !== null) {
       map.set(value, synthetic);
     }
