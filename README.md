@@ -1,13 +1,20 @@
 # Amnesia Protocol Lite
 
+[![Version](https://img.shields.io/badge/Version-v0.2.4-aa7651?style=flat-square)](#status)
 [![Offline-first](https://img.shields.io/badge/Privacy-offline--first-637157?style=flat-square)](#privacy-en-beveiliging)
+[![Zero Cloud](https://img.shields.io/badge/Telemetry-Zero%20%2F%20No%20Tracking-2e532b?style=flat-square)](#privacy-en-beveiliging)
 [![Local AI](https://img.shields.io/badge/AI-local%20Ollama-c9a957?style=flat-square)](#synthetische-tweede-laag)
-[![macOS](https://img.shields.io/badge/Platform-macOS%20Apple%20Silicon-252522?style=flat-square&logo=apple&logoColor=white)](#installeren)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20Apple%20Silicon-252522?style=flat-square&logo=apple&logoColor=white)](#installeren)
+[![GitHub last commit](https://img.shields.io/github/last-commit/parvenuprompting/amnesia-protocol-lite?style=flat-square)](https://github.com/parvenuprompting/amnesia-protocol-lite/commits/main)
+
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=20232A)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev/)
 [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=flat-square&logo=tauri&logoColor=111111)](https://tauri.app/)
+[![Rust](https://img.shields.io/badge/Rust-1.80%2B-000000?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Testing](https://img.shields.io/badge/Testing-Vitest%20%2B%20Playwright-6e9fcb?style=flat-square)](#testen-en-bouwen)
+[![Code Style](https://img.shields.io/badge/Code%20Style-Prettier%20%2B%20ESLint-ff69b4?style=flat-square&logo=prettier&logoColor=white)](#testen-en-bouwen)
 
 Amnesia Protocol Lite is een lokale desktopwerkplek voor het gecontroleerd opschonen en synthetiseren van gevoelige tekst. De app combineert menselijke review, getypeerde pseudonimisering en een expliciete tweede laag voor realistische fictieve data. Zo kan tekst veilig worden voorbereid voordat die een ander venster of een cloud-LLM bereikt.
 
@@ -42,9 +49,9 @@ De app heeft geen serverlaag. De standaardflow blijft binnen de desktopapp; alle
 
 ![Amnesia Protocol Review Workspace](docs/images/review-screen.png)
 
-### 02 Synthetische Vervangers
+### Terminaluitvoer Opschonen
 
-![Amnesia Protocol Synthetische Vervangers](docs/images/synthetic-screen.png)
+![Amnesia Protocol Terminaluitvoer Opschonen](docs/images/terminal-screen.png)
 
 ### 03 Lokale Chat
 
