@@ -663,6 +663,23 @@ button:disabled {
     11px ui-monospace,
     monospace;
 }
+.clipboard-clear-control {
+  display: grid;
+  gap: 4px;
+  color: #817e75;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.clipboard-clear-control select {
+  border: 1px solid #d8d4ca;
+  border-radius: 6px;
+  padding: 8px 9px;
+  color: #4f4d46;
+  background: #fffefa;
+  font-size: 11px;
+}
 .clipboard-status {
   min-width: 150px;
   color: #8f8a80;

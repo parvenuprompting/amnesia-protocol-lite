@@ -1,5 +1,9 @@
 import { Clipboard, Sparkles } from "lucide-react";
-import type { ClipboardStatus } from "./clipboard";
+import {
+  CLIPBOARD_CLEAR_OPTIONS,
+  type ClipboardClearDelay,
+  type ClipboardStatus,
+} from "./clipboard";
 import type { DetectionType } from "./types";
 
 export type { ClipboardStatus } from "./clipboard";
@@ -9,10 +13,12 @@ type ReviewBottomBarProps = {
   selectedType: DetectionType;
   acceptedCount: number;
   clipboardStatus: ClipboardStatus;
+  clipboardClearAfter: ClipboardClearDelay;
   onTypeChange: (type: DetectionType) => void;
   onAcceptPending: () => void;
   onForceAll: () => void;
   onCopy: () => void;
+  onClipboardClearAfterChange: (value: ClipboardClearDelay) => void;
 };
 
 export function ReviewBottomBar({
@@ -20,10 +26,12 @@ export function ReviewBottomBar({
   selectedType,
   acceptedCount,
   clipboardStatus,
+  clipboardClearAfter,
   onTypeChange,
   onAcceptPending,
   onForceAll,
   onCopy,
+  onClipboardClearAfterChange,
 }: ReviewBottomBarProps) {
   return (
     <section className="bottom-bar">
@@ -45,6 +53,22 @@ export function ReviewBottomBar({
         <span className="output-label">OUTPUT</span>
         <span>{acceptedCount} vervangingen voorbereid</span>
       </div>
+      <label className="clipboard-clear-control">
+        <span>Clipboard</span>
+        <select
+          aria-label="Klembord automatisch leegmaken"
+          value={clipboardClearAfter}
+          onChange={(event) =>
+            onClipboardClearAfterChange(Number(event.target.value) as ClipboardClearDelay)
+          }
+        >
+          {CLIPBOARD_CLEAR_OPTIONS.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
       <div
         className={`clipboard-status ${clipboardStatus.state}`}
         aria-live="polite"
