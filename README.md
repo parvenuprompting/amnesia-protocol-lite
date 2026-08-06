@@ -11,6 +11,14 @@ Amnesia Protocol is een lokale, offline-first privacyfilter voor tekst. De app d
 
 De app is bedoeld voor persoonlijk gebruik op één Mac. Het doel is gecontroleerde pseudonimisering, niet anonimiteit.
 
+## Screenshots
+
+### Welkomstscherm
+![Amnesia Protocol Welkomstscherm](docs/images/home-screen.png)
+
+### Review Workspace
+![Amnesia Protocol Review Workspace](docs/images/review-screen.png)
+
 ## Kernprincipes
 
 - **Lokaal:** tekst wordt in de app verwerkt; er is geen account, server of telemetrie.

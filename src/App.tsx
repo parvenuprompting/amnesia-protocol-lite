@@ -76,15 +76,21 @@ function App() {
   const [message, setMessage] = useState("Klaar voor beoordeling");
   const [selectedType, setSelectedType] = useState<DetectionType>("person");
   const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [toastKey, setToastKey] = useState(0);
   const [clipboardStatus, setClipboardStatus] = useState<ClipboardStatus>({ state: "idle" });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    if (message === "Klaar voor beoordeling") return;
+  const showToast = (msg: string) => {
+    setMessage(msg);
+    setToastKey((prev) => prev + 1);
     setFeedbackVisible(true);
+  };
+
+  useEffect(() => {
+    if (!feedbackVisible) return;
     const timeout = window.setTimeout(() => setFeedbackVisible(false), 2400);
     return () => window.clearTimeout(timeout);
-  }, [message]);
+  }, [feedbackVisible, toastKey]);
 
   const update = (action: ReviewAction) => {
     setHistory((items) => [...items, detections]);
@@ -96,13 +102,13 @@ function App() {
     setText(value);
     setDetections(mergeDetections(detections, detect(value), value));
     setFuture([]);
-    setMessage("Nieuwe tekst gedetecteerd");
+    showToast("Nieuwe tekst gedetecteerd");
   };
 
   const addManual = () => {
     const editor = textareaRef.current;
     if (!editor || editor.selectionStart === editor.selectionEnd) {
-      setMessage("Selecteer eerst tekst in het invoerveld");
+      showToast("Selecteer eerst tekst in het invoerveld");
       return;
     }
     const start = editor.selectionStart;
@@ -120,7 +126,7 @@ function App() {
     setHistory((items) => [...items, detections]);
     setFuture([]);
     setDetections([...detections, manual].sort((a, b) => a.start - b.start));
-    setMessage("Handmatige markering toegevoegd");
+    showToast("Handmatige markering toegevoegd");
   };
 
   const undo = () => {
@@ -129,7 +135,7 @@ function App() {
     setFuture((items) => [...items, detections]);
     setDetections(previous);
     setHistory((items) => items.slice(0, -1));
-    setMessage("Actie ongedaan gemaakt");
+    showToast("Actie ongedaan gemaakt");
   };
 
   const redo = () => {
@@ -138,7 +144,7 @@ function App() {
     setHistory((items) => [...items, detections]);
     setDetections(next);
     setFuture((items) => items.slice(0, -1));
-    setMessage("Actie opnieuw toegepast");
+    showToast("Actie opnieuw toegepast");
   };
 
   const tokens = useMemo(() => {
@@ -171,19 +177,19 @@ function App() {
       await copyAndVerify(output);
       const successMessage = `${count} markeringen gekopieerd`;
       setClipboardStatus({ state: "success", message: successMessage });
-      setMessage(successMessage);
+      showToast(successMessage);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "onbekende clipboardfout";
       setClipboardStatus({ state: "error", message: "Kopiëren mislukt" });
       console.error("Clipboard copy failed:", errorMessage);
-      setMessage("Kopiëren is niet gelukt");
+      showToast("Kopiëren is niet gelukt");
     }
   };
 
   const replaceAll = () => {
     if (!detections.length) {
       setClipboardStatus({ state: "error", message: "Geen kandidaten om te vervangen" });
-      setMessage("Geen kandidaten om te vervangen");
+      showToast("Geen kandidaten om te vervangen");
       return;
     }
     if (
@@ -198,7 +204,7 @@ function App() {
     setDetections(allAccepted);
     const successMessage = `${detections.length} items vervangen. Controleer de tekst en klik daarna op Kopieer veilige tekst.`;
     setClipboardStatus({ state: "success", message: successMessage });
-    setMessage(successMessage);
+    showToast(successMessage);
   };
 
   return (
@@ -377,32 +383,71 @@ function App() {
                       <button
                         type="button"
                         onClick={() => {
-                          update({ id: item.id, decision: "accepted" });
-                          setMessage("Generieke vervanger aangemaakt");
+                          const nextDecision =
+                            item.decision === "accepted" ? "pending" : "accepted";
+                          update({ id: item.id, decision: nextDecision });
+                          showToast(
+                            nextDecision === "accepted"
+                              ? "Generieke vervanger aangemaakt"
+                              : "Markering hersteld naar open",
+                          );
                         }}
-                        className="generate"
+                        className={`generate ${item.decision === "accepted" ? "active" : ""}`}
                         data-testid={`generate-${item.id}`}
-                      >
-                        <Sparkles size={14} /> Genereer token
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => update({ id: item.id, decision: "rejected" })}
-                        className="reject"
-                        title="Laat deze kandidaat ongewijzigd"
-                      >
-                        <X size={14} /> Negeren
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          update({
-                            id: item.id,
-                            decision: "edited",
-                            value: window.prompt("Pas de waarde aan", item.value) ?? item.value,
-                          })
+                        aria-label="Genereer token"
+                        title={
+                          item.decision === "accepted"
+                            ? "Token geactiveerd (klik om te herstellen)"
+                            : "Genereer een generieke vervanger"
                         }
-                        className="edit"
+                      >
+                        {item.decision === "accepted" ? (
+                          <Check size={14} />
+                        ) : (
+                          <Sparkles size={14} />
+                        )}
+                        {item.decision === "accepted" ? "Token actief" : "Genereer token"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextDecision =
+                            item.decision === "rejected" ? "pending" : "rejected";
+                          update({ id: item.id, decision: nextDecision });
+                          showToast(
+                            nextDecision === "rejected"
+                              ? "Kandidaat genegeerd"
+                              : "Markering hersteld naar open",
+                          );
+                        }}
+                        className={`reject ${item.decision === "rejected" ? "active" : ""}`}
+                        aria-label="Negeren"
+                        title={
+                          item.decision === "rejected"
+                            ? "Kandidaat is genegeerd (klik om te herstellen)"
+                            : "Laat deze kandidaat ongewijzigd"
+                        }
+                      >
+                        <X size={14} /> {item.decision === "rejected" ? "Genegeerd" : "Negeren"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const promptResult = window.prompt("Pas de waarde aan", item.value);
+                          if (promptResult !== null) {
+                            const trimmed = promptResult.trim();
+                            if (trimmed) {
+                              update({
+                                id: item.id,
+                                decision: "edited",
+                                value: trimmed,
+                              });
+                              showToast("Waarde aangepast");
+                            }
+                          }
+                        }}
+                        className={`edit ${item.decision === "edited" ? "active" : ""}`}
+                        aria-label="Waarde aanpassen"
                         title="Pas de gemarkeerde waarde aan"
                       >
                         Waarde aanpassen
