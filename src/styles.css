@@ -56,6 +56,25 @@ button:disabled {
 .brand span {
   display: block;
 }
+.brand-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.brand-title .brand-lite-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #c8c2b5;
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: #817d72;
+  background: #ebe7de;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
 .brand strong {
   font-size: 13px;
   letter-spacing: 0.01em;
@@ -1314,6 +1333,15 @@ footer span {
   display: flex;
   gap: 5px;
   align-items: center;
+}
+.footer-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.footer-meta > span:first-child,
+.footer-meta > span:nth-child(2) {
+  color: #b2ada2;
 }
 .modal-backdrop {
   position: fixed;

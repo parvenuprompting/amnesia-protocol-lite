@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import packageJson from "../package.json";
 import { Check, Eraser, EyeOff, RotateCcw, RotateCw, Settings } from "lucide-react";
 import { AppDialog } from "./AppDialog";
 import {
@@ -317,7 +318,10 @@ function App() {
             <EyeOff size={17} />
           </div>
           <div>
-            <strong>Amnesia Protocol</strong>
+            <div className="brand-title">
+              <strong>Amnesia Protocol</strong>
+              <span className="brand-lite-badge">Lite</span>
+            </div>
             <span>private review workspace</span>
           </div>
         </div>
@@ -489,9 +493,13 @@ function App() {
         />
       )}
       <footer>
-        <span>
-          <Eraser size={13} /> Alleen sessiegeheugen · geen opslag
-        </span>
+        <div className="footer-meta">
+          <span>© Tiëndo Welles</span>
+          <span>v{packageJson.version}</span>
+          <span>
+            <Eraser size={13} /> Alleen sessiegeheugen · geen opslag
+          </span>
+        </div>
         <span>{message}</span>
       </footer>
     </main>
