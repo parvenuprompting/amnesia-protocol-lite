@@ -17,7 +17,7 @@ import { htmlToPlainText, insertTextAtSelection } from "./html";
 import { generateWithOllama } from "./ollama";
 import { applyAction, mergeDetections, replaceAccepted, type ReviewAction } from "./review";
 import { SyntheticPanel, type SyntheticEntry } from "./SyntheticPanel";
-import { createSyntheticMap } from "./synthetic";
+import { createSyntheticMap, parseSyntheticMarkers, replaceSyntheticMarkers } from "./synthetic";
 import type { Detection, DetectionType } from "./types";
 import { TYPE_LABELS } from "./types";
 
@@ -94,6 +94,7 @@ function App() {
   const [toastKey, setToastKey] = useState(0);
   const [clipboardStatus, setClipboardStatus] = useState<ClipboardStatus>({ state: "idle" });
   const [dialog, setDialog] = useState<DialogState>({ open: false });
+  const [syntheticInput, setSyntheticInput] = useState("");
   const [syntheticValues, setSyntheticValues] = useState<Map<string, string>>(new Map());
   const [ollamaModel, setOllamaModel] = useState("llama3.2");
   const [otherFormatHint, setOtherFormatHint] = useState("");
@@ -232,54 +233,19 @@ function App() {
   );
   const output = replaceAccepted(text, detections, tokens);
 
-  const syntheticEntries = useMemo<SyntheticEntry[]>(() => {
-    const seen = new Set<string>();
-    return detections
-      .filter((item) => item.decision === "accepted" || item.decision === "edited")
-      .filter((item) => {
-        if (seen.has(item.value)) return false;
-        seen.add(item.value);
-        return true;
-      })
-      .map((item) => ({
-        key: `${item.type}:${item.value}`,
-        token: tokens.get(item.value) ?? tokenFor(item.type, 1),
-        type: item.type,
-        value: item.value,
-        replacement: syntheticValues.get(item.value) ?? "",
-      }));
-  }, [detections, syntheticValues, tokens]);
-
-  const syntheticReplacementMap = useMemo(() => {
-    const replacements = new Map(syntheticValues);
-    detections
-      .filter((item) => item.decision === "accepted" || item.decision === "edited")
-      .forEach((item) => {
-        if (!replacements.has(item.value)) {
-          replacements.set(item.value, tokens.get(item.value) ?? `[${tokenFor(item.type, 1)}]`);
-        }
-      });
-    return replacements;
-  }, [detections, syntheticValues, tokens]);
-
-  const syntheticOutput = replaceAccepted(text, detections, syntheticReplacementMap);
-
-  useEffect(() => {
-    if (screen !== "synthetic") return;
-    const generated = createSyntheticMap(
-      detections
-        .filter((item) => item.decision === "accepted" || item.decision === "edited")
-        .map((item) => ({ type: item.type, value: item.value })),
-      sessionSeed,
-    );
-    setSyntheticValues((current) => {
-      const next = new Map(current);
-      generated.forEach((value, key) => {
-        if (!next.has(key)) next.set(key, value);
-      });
-      return next;
-    });
-  }, [detections, screen, sessionSeed]);
+  const syntheticMarkers = useMemo(() => parseSyntheticMarkers(syntheticInput), [syntheticInput]);
+  const syntheticEntries = useMemo<SyntheticEntry[]>(
+    () =>
+      syntheticMarkers.map((marker) => ({
+        key: marker.token,
+        token: marker.token,
+        type: marker.type,
+        value: marker.token,
+        replacement: syntheticValues.get(marker.token) ?? "",
+      })),
+    [syntheticMarkers, syntheticValues],
+  );
+  const syntheticOutput = replaceSyntheticMarkers(syntheticInput, syntheticValues);
 
   const copyOutput = async () => {
     if (
@@ -330,14 +296,16 @@ function App() {
   };
 
   const generateStandardReplacements = () => {
+    if (!syntheticMarkers.length) {
+      showToast("Plak eerst de veilige tekst uit laag 1");
+      return;
+    }
     const generated = createSyntheticMap(
-      detections
-        .filter((item) => item.decision === "accepted" || item.decision === "edited")
-        .map((item) => ({ type: item.type, value: item.value })),
+      syntheticMarkers.map((marker) => ({ type: marker.type, value: marker.token })),
       sessionSeed,
     );
     setSyntheticValues((current) => new Map([...current, ...generated]));
-    showToast("Standaardvervangers gegenereerd");
+    showToast(`${generated.size} standaardvervanger${generated.size === 1 ? "" : "s"} gegenereerd`);
   };
 
   const generateOther = async (entry: SyntheticEntry) => {
@@ -349,11 +317,11 @@ function App() {
     setAiError("");
     try {
       const replacement = await generateWithOllama(
-        entry.value,
+        entry.token,
         otherFormatHint,
         ollamaModel.trim(),
       );
-      setSyntheticValues((current) => new Map(current).set(entry.value, replacement));
+      setSyntheticValues((current) => new Map(current).set(entry.token, replacement));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Onbekende Ollama-fout";
       setAiError(`${message}. Controleer of Ollama draait en het model lokaal beschikbaar is.`);
@@ -363,10 +331,14 @@ function App() {
   };
 
   const updateSyntheticReplacement = (entry: SyntheticEntry, value: string) => {
-    setSyntheticValues((current) => new Map(current).set(entry.value, value));
+    setSyntheticValues((current) => new Map(current).set(entry.token, value));
   };
 
   const copySynthetic = async () => {
+    if (!syntheticEntries.length) {
+      showToast("Er zijn nog geen markers om te vervangen");
+      return;
+    }
     const missing = syntheticEntries.filter((entry) => !entry.replacement.trim());
     if (missing.length) {
       showToast("Genereer eerst alle vervangers voordat je kopieert");
@@ -690,11 +662,16 @@ function App() {
           ) : (
             <SyntheticPanel
               entries={syntheticEntries}
+              sourceText={syntheticInput}
               syntheticText={syntheticOutput}
               model={ollamaModel}
               formatHint={otherFormatHint}
               aiBusy={aiBusy}
               aiError={aiError}
+              onSourceTextChange={(value) => {
+                setSyntheticInput(value);
+                setAiError("");
+              }}
               onModelChange={setOllamaModel}
               onFormatHintChange={setOtherFormatHint}
               onGenerateAll={generateStandardReplacements}

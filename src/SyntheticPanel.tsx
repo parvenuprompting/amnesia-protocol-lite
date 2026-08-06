@@ -12,11 +12,13 @@ export type SyntheticEntry = {
 
 type SyntheticPanelProps = {
   entries: SyntheticEntry[];
+  sourceText: string;
   syntheticText: string;
   model: string;
   formatHint: string;
   aiBusy: boolean;
   aiError: string;
+  onSourceTextChange: (value: string) => void;
   onModelChange: (value: string) => void;
   onFormatHintChange: (value: string) => void;
   onGenerateAll: () => void;
@@ -27,11 +29,13 @@ type SyntheticPanelProps = {
 
 export function SyntheticPanel({
   entries,
+  sourceText,
   syntheticText,
   model,
   formatHint,
   aiBusy,
   aiError,
+  onSourceTextChange,
   onModelChange,
   onFormatHintChange,
   onGenerateAll,
@@ -47,9 +51,21 @@ export function SyntheticPanel({
         <div className="panel-head">
           <div>
             <span className="panel-kicker">TWEEDE LAAG</span>
-            <span className="panel-title">Synthetische tekst</span>
+            <span className="panel-title">Geplakte veilige tekst</span>
           </div>
-          <span className="char-count">{syntheticText.length} tekens</span>
+          <span className="char-count">{sourceText.length} tekens</span>
+        </div>
+        <textarea
+          className="synthetic-source-textarea"
+          aria-label="Veilige tekst voor synthetische laag"
+          value={sourceText}
+          onChange={(event) => onSourceTextChange(event.target.value)}
+          spellCheck={false}
+          placeholder="Plak hier de tekst die je uit laag 1 hebt gekopieerd, bijvoorbeeld EMAIL_1 of CUSTOMER_1."
+        />
+        <div className="synthetic-output-head">
+          <span className="panel-kicker">OUTPUT</span>
+          <span>{syntheticText.length} tekens na generatie</span>
         </div>
         <textarea
           className="synthetic-textarea"
@@ -59,7 +75,7 @@ export function SyntheticPanel({
           spellCheck={false}
         />
         <div className="synthetic-output-foot">
-          <span>Alle waarden zijn lokaal gegenereerd.</span>
+          <span>Genereer eerst expliciet nieuwe waarden.</span>
           <button type="button" className="copy-button" onClick={onCopy}>
             <Clipboard size={16} /> Kopieer synthetische tekst
           </button>
@@ -122,7 +138,7 @@ export function SyntheticPanel({
                 <span className="candidate-type">{TYPE_LABELS[entry.type]}</span>
                 <code>{entry.token}</code>
               </div>
-              <div className="synthetic-original">{entry.value}</div>
+              <div className="synthetic-original">Marker uit input: {entry.token}</div>
               <div className="synthetic-replacement-row">
                 <input
                   aria-label={`Fictieve vervanger voor ${entry.token}`}
@@ -148,7 +164,7 @@ export function SyntheticPanel({
           ))}
           {!entries.length && (
             <div className="empty">
-              <p>Beoordeel eerst minstens één markering als vervanger.</p>
+              <p>Plak eerst veilige tekst met markers uit laag 1.</p>
             </div>
           )}
         </div>
