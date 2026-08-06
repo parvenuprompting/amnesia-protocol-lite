@@ -145,6 +145,12 @@ hdiutil create \
   "src-tauri/target/release/bundle/dmg/Amnesia Protocol_0.1.0_aarch64.dmg"
 ```
 
+## Klembordcontrole
+
+Beide kopieeracties gebruiken dezelfde lokale clipboardadapter. Na het schrijven leest Amnesia Protocol het klembord direct terug en vergelijkt het resultaat met de verwachte tekst. Alleen bij een overeenkomende readback wordt succes gemeld. De UI toont tijdens het kopiëren `Kopiëren...` en daarna een blijvende succes- of foutstatus naast de knoppen.
+
+De browser-e2e-tests geven Playwright expliciete klembordrechten en controleren de gekopieerde inhoud. Dit valideert de browserfallback. Controleer voor een native macOS-release ook handmatig de gebouwde `.app`: kopieer een tekst met een token, plak die in een lokale teksteditor en controleer dat bijvoorbeeld `EMAIL_1` aanwezig is. De native Tauri-permissies staan in `src-tauri/capabilities/default.json`.
+
 ## Privacy en beveiliging
 
 De MVP doet geen netwerkverzoeken tijdens de normale workflow en heeft geen analytics of telemetrie. Tauri-capabilities zijn beperkt tot de clipboard-plugin.

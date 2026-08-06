@@ -622,6 +622,23 @@ button:disabled {
     11px ui-monospace,
     monospace;
 }
+.clipboard-status {
+  min-width: 150px;
+  color: #8f8a80;
+  font:
+    10px ui-monospace,
+    monospace;
+  text-align: right;
+}
+.clipboard-status.copying {
+  color: #806244;
+}
+.clipboard-status.success {
+  color: #5f7956;
+}
+.clipboard-status.error {
+  color: #a36e62;
+}
 .copy-button {
   display: flex;
   align-items: center;

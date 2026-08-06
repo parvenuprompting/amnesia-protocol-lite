@@ -11,7 +11,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { copyAndVerify } from "./clipboard";
 import { detect } from "./detectors";
 import { applyAction, mergeDetections, replaceAccepted, type ReviewAction } from "./review";
 import type { Detection, DetectionType } from "./types";
@@ -20,6 +20,11 @@ import { TYPE_LABELS } from "./types";
 const initialText =
   "Plak hier de tekst die je wilt controleren. Bijvoorbeeld: klantnummer 123456 of e-mail klant@example.com.";
 const typeOptions = Object.entries(TYPE_LABELS) as [DetectionType, string][];
+type ClipboardStatus =
+  | { state: "idle" }
+  | { state: "copying" }
+  | { state: "success"; message: string }
+  | { state: "error"; message: string };
 
 function tokenFor(type: DetectionType, index: number) {
   return `${type.toUpperCase()}_${index}`;
@@ -71,6 +76,7 @@ function App() {
   const [message, setMessage] = useState("Klaar voor beoordeling");
   const [selectedType, setSelectedType] = useState<DetectionType>("person");
   const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [clipboardStatus, setClipboardStatus] = useState<ClipboardStatus>({ state: "idle" });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -157,13 +163,19 @@ function App() {
       )
     )
       return;
+    setClipboardStatus({ state: "copying" });
     try {
-      if ("__TAURI_INTERNALS__" in window) await writeText(output);
-      else await navigator.clipboard.writeText(output);
-      setMessage(
-        `${detections.filter((item) => item.decision === "accepted" || item.decision === "edited").length} markeringen gekopieerd`,
-      );
-    } catch {
+      const count = detections.filter(
+        (item) => item.decision === "accepted" || item.decision === "edited",
+      ).length;
+      await copyAndVerify(output);
+      const successMessage = `${count} markeringen gekopieerd`;
+      setClipboardStatus({ state: "success", message: successMessage });
+      setMessage(successMessage);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "onbekende clipboardfout";
+      setClipboardStatus({ state: "error", message: "Kopiëren mislukt" });
+      console.error("Clipboard copy failed:", errorMessage);
       setMessage("Kopiëren is niet gelukt");
     }
   };
@@ -179,17 +191,22 @@ function App() {
       )
     )
       return;
+    setClipboardStatus({ state: "copying" });
     const allAccepted = detections.map((item) => ({ ...item, decision: "accepted" as const }));
     const allTokens = createTokens(allAccepted);
     const allOutput = replaceAccepted(text, allAccepted, allTokens);
     try {
-      if ("__TAURI_INTERNALS__" in window) await writeText(allOutput);
-      else await navigator.clipboard.writeText(allOutput);
+      await copyAndVerify(allOutput);
       setHistory((items) => [...items, detections]);
       setFuture([]);
       setDetections(allAccepted);
-      setMessage(`${detections.length} items vervangen en gekopieerd`);
-    } catch {
+      const successMessage = `${detections.length} items vervangen en gekopieerd`;
+      setClipboardStatus({ state: "success", message: successMessage });
+      setMessage(successMessage);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "onbekende clipboardfout";
+      setClipboardStatus({ state: "error", message: "Kopiëren mislukt" });
+      console.error("Bulk clipboard copy failed:", errorMessage);
       setMessage("Kopiëren is niet gelukt");
     }
   };
@@ -438,17 +455,34 @@ function App() {
                 vervangingen voorbereid
               </span>
             </div>
-            <button className="copy-button" onClick={copyOutput}>
-              <Clipboard size={17} /> Kopieer veilige tekst
+            <div
+              className={`clipboard-status ${clipboardStatus.state}`}
+              aria-live="polite"
+              data-testid="clipboard-status"
+            >
+              {clipboardStatus.state === "copying" && "Kopiëren..."}
+              {clipboardStatus.state === "success" && clipboardStatus.message}
+              {clipboardStatus.state === "error" && clipboardStatus.message}
+            </div>
+            <button
+              className="copy-button"
+              type="button"
+              onClick={copyOutput}
+              disabled={clipboardStatus.state === "copying"}
+            >
+              <Clipboard size={17} />{" "}
+              {clipboardStatus.state === "copying" ? "Kopiëren..." : "Kopieer veilige tekst"}
             </button>
             <button
               className="bulk-copy-button"
               type="button"
               onClick={replaceAllAndCopy}
+              disabled={clipboardStatus.state === "copying"}
               data-testid="replace-all-copy"
               title="Vervang alle geflagde items en kopieer de tekst"
             >
-              <Sparkles size={16} /> Alles vervangen & kopiëren
+              <Sparkles size={16} />{" "}
+              {clipboardStatus.state === "copying" ? "Bezig..." : "Alles vervangen & kopiëren"}
             </button>
           </section>
         </>
