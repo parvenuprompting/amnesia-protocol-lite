@@ -35,8 +35,13 @@ test("plakken, reviewen, handmatig markeren en undo", async ({ page }) => {
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByRole("status")).toHaveText("Actie ongedaan gemaakt");
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByTestId("replace-all-copy").click();
-  await expect(page.getByRole("status")).toHaveText(/items vervangen en gekopieerd/);
+  await page.getByTestId("replace-all").click();
+  await expect(page.getByRole("status")).toHaveText(/items vervangen\. Controleer de tekst/);
+  await expect(page.evaluate(() => navigator.clipboard.readText())).resolves.not.toContain(
+    "CUSTOMER_1",
+  );
+  await page.getByRole("button", { name: "Kopieer veilige tekst" }).click();
+  await expect(page.getByTestId("clipboard-status")).toHaveText(/markeringen gekopieerd/);
   await expect(page.evaluate(() => navigator.clipboard.readText())).resolves.toContain(
     "CUSTOMER_1",
   );
