@@ -19,10 +19,22 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 const SETTINGS_KEY = "amnesia-protocol.settings.v1";
 
+/**
+ * Oude defaults die op deze Macs niet (meer) kloppen. `mistral:latest` was de chatdefault en staat
+ * hier niet geïnstalleerd; wie die waarde nog in localStorage heeft, krijgt de nieuwe default.
+ */
+const LEGACY_MODEL_DEFAULTS: Readonly<Record<string, string>> = {
+  "mistral:latest": DEFAULT_SETTINGS.chatModel,
+};
+
 function savedModel(value: unknown, fallback: string): string {
   return typeof value === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$/.test(value)
     ? value
     : fallback;
+}
+
+function migreer(model: string): string {
+  return LEGACY_MODEL_DEFAULTS[model] ?? model;
 }
 
 export function loadSettings(
@@ -41,8 +53,10 @@ export function loadSettings(
         ? ((parsed?.clipboardClearAfter ??
             DEFAULT_SETTINGS.clipboardClearAfter) as ClipboardClearDelay)
         : DEFAULT_SETTINGS.clipboardClearAfter,
-      replacementModel: savedModel(parsed?.replacementModel, DEFAULT_SETTINGS.replacementModel),
-      chatModel: savedModel(parsed?.chatModel, DEFAULT_SETTINGS.chatModel),
+      replacementModel: migreer(
+        savedModel(parsed?.replacementModel, DEFAULT_SETTINGS.replacementModel),
+      ),
+      chatModel: migreer(savedModel(parsed?.chatModel, DEFAULT_SETTINGS.chatModel)),
     };
   } catch {
     return DEFAULT_SETTINGS;

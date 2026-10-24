@@ -28,6 +28,17 @@ describe("persistent settings", () => {
     expect(loadSettings(storage)).toEqual(settings);
   });
 
+  it("migreert de oude chatdefault mistral:latest naar de huidige default", () => {
+    const storage = createStorage();
+    storage.setItem(
+      "amnesia-protocol.settings.v1",
+      JSON.stringify({ chatModel: "mistral:latest", replacementModel: "amnesia-qwen:4b" }),
+    );
+    const loaded = loadSettings(storage);
+    expect(loaded.chatModel).toBe(DEFAULT_SETTINGS.chatModel);
+    expect(loaded.replacementModel).toBe("amnesia-qwen:4b");
+  });
+
   it("sanitizes invalid persisted values", () => {
     const storage = createStorage();
     storage.setItem(

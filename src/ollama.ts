@@ -63,26 +63,42 @@ export type OllamaCatalogModel = {
   downloadSize: string;
   recommendedRam: string;
   description: string;
+  /** Staat al op deze Mac (ons getrainde model); niet in de downloadlijst. */
+  local?: boolean;
 };
 
 export const REPLACEMENT_OLLAMA_MODEL = "amnesia-qwen:4b";
-export const PRIMARY_OLLAMA_MODEL = "mistral:latest";
+export const PRIMARY_OLLAMA_MODEL = "qwen3.5:4b";
 export const LIGHTWEIGHT_CHAT_MODEL = "gemma3:1b";
 
+/**
+ * Het model voor OTHER-vervangingen staat hier bewust ook in, met `local: true`: het is niet bij
+ * Ollama te downloaden (het is hier getraind) en hoort dus niet in de downloadlijst, maar de
+ * gebruiker moet wél kunnen zien welk model de app daarvoor gebruikt.
+ */
 export const OLLAMA_CATALOG: OllamaCatalogModel[] = [
   {
-    name: "qwen3.5:4b",
-    label: "Qwen 3.5 4B (basis)",
-    downloadSize: "~3 GB",
+    name: REPLACEMENT_OLLAMA_MODEL,
+    label: "Amnesia Qwen 4B (getraind)",
+    downloadSize: "2,7 GB lokaal",
     recommendedRam: "8 GB RAM",
-    description: "Basismodel voor de lokale OTHER-modelproef; niet de getrainde Amnesia-adapter.",
+    description:
+      "Ons getrainde model voor OTHER-vervangingen: één fictieve waarde in het gevraagde formaat, of weigeren.",
+    local: true,
   },
   {
     name: PRIMARY_OLLAMA_MODEL,
-    label: "Mistral",
+    label: "Qwen 3.5 4B",
+    downloadSize: "~3 GB",
+    recommendedRam: "8 GB RAM",
+    description: "Chatmodel, en de basis waarop het Amnesia-model is getraind.",
+  },
+  {
+    name: "mistral:latest",
+    label: "Mistral 7B",
     downloadSize: "~4.1 GB",
     recommendedRam: "16 GB RAM",
-    description: "Primair model voor chat en OTHER-vervangingen.",
+    description: "Alternatief chatmodel; zwaarder en niet getraind op het Amnesia-contract.",
   },
   {
     name: LIGHTWEIGHT_CHAT_MODEL,

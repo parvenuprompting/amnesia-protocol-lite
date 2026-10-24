@@ -150,7 +150,7 @@ export function SettingsPanel({
                 onChange={(event) => onDownloadModelChange(event.target.value)}
                 disabled={pullBusy}
               >
-                {OLLAMA_CATALOG.map((model) => (
+                {OLLAMA_CATALOG.filter((model) => !model.local).map((model) => (
                   <option key={model.name} value={model.name}>
                     {model.label} · {model.downloadSize}
                   </option>
