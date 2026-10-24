@@ -1,11 +1,6 @@
 import { Download, RefreshCw, X } from "lucide-react";
 import { CLIPBOARD_CLEAR_OPTIONS, type ClipboardClearDelay } from "./clipboard";
-import {
-  FALLBACK_OLLAMA_MODEL,
-  hasMistralModel,
-  OLLAMA_CATALOG,
-  type OllamaLocalModel,
-} from "./ollama";
+import { OLLAMA_CATALOG, type OllamaLocalModel } from "./ollama";
 import type { SyntheticLocale } from "./synthetic";
 
 type SettingsPanelProps = {
@@ -18,8 +13,12 @@ type SettingsPanelProps = {
   pullBusy: boolean;
   pullProgress: string;
   hardwareInfo: string;
+  replacementModel: string;
+  chatModel: string;
   onLocaleChange: (value: SyntheticLocale) => void;
   onClipboardClearAfterChange: (value: ClipboardClearDelay) => void;
+  onReplacementModelChange: (value: string) => void;
+  onChatModelChange: (value: string) => void;
   onRefreshModels: () => void;
   onDownloadModelChange: (value: string) => void;
   onPullModel: () => void;
@@ -36,14 +35,25 @@ export function SettingsPanel({
   pullBusy,
   pullProgress,
   hardwareInfo,
+  replacementModel,
+  chatModel,
   onLocaleChange,
   onClipboardClearAfterChange,
+  onReplacementModelChange,
+  onChatModelChange,
   onRefreshModels,
   onDownloadModelChange,
   onPullModel,
   onClose,
 }: SettingsPanelProps) {
   const selectedDownload = OLLAMA_CATALOG.find((item) => item.name === downloadModel);
+  const modelOptions = (selected: string) => {
+    const options = [...localModels];
+    if (selected && !options.some((model) => model.name === selected)) {
+      options.unshift({ name: selected });
+    }
+    return options;
+  };
 
   return (
     <div className="settings-backdrop" role="dialog" aria-modal="true" aria-label="Instellingen">
@@ -66,24 +76,35 @@ export function SettingsPanel({
 
         <section className="settings-section">
           <h3>Lokale AI</h3>
-          <div className="settings-model-status">
-            <span>Mistral</span>
-            <strong className={hasMistralModel(localModels) ? "available" : "missing"}>
-              {hasMistralModel(localModels) ? "Lokaal beschikbaar" : "Ontbreekt"}
-            </strong>
-            <span>Gemma 3 1B fallback</span>
-            <strong
-              className={
-                localModels.some((model) => model.name === FALLBACK_OLLAMA_MODEL)
-                  ? "available"
-                  : "missing"
-              }
+          <label>
+            <span>Model voor OTHER-vervangingen</span>
+            <select
+              value={replacementModel}
+              onChange={(event) => onReplacementModelChange(event.target.value)}
             >
-              {localModels.some((model) => model.name === FALLBACK_OLLAMA_MODEL)
-                ? "Lokaal beschikbaar"
-                : "Ontbreekt"}
-            </strong>
-          </div>
+              {modelOptions(replacementModel).map((model) => (
+                <option key={model.name} value={model.name}>
+                  {model.name}
+                  {model.parameterSize ? ` · ${model.parameterSize}` : " · niet aangetroffen"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Model voor algemene chat</span>
+            <select value={chatModel} onChange={(event) => onChatModelChange(event.target.value)}>
+              {modelOptions(chatModel).map((model) => (
+                <option key={model.name} value={model.name}>
+                  {model.name}
+                  {model.parameterSize ? ` · ${model.parameterSize}` : " · niet aangetroffen"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p>
+            Modellen zijn strikt gescheiden. Een ontbrekend geselecteerd model geeft een fout; er
+            wordt nooit stil naar een ander model uitgeweken.
+          </p>
           <div className="settings-inline-row">
             <span className={`ollama-status ${ollamaStatus}`}>
               {ollamaStatus === "loading" && "Modellen ophalen..."}

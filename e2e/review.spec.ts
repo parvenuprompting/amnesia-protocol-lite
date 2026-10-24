@@ -79,7 +79,7 @@ test("opent instellingen vanaf de topbar", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Instellingen" }).click();
   await expect(page.getByRole("dialog", { name: "Instellingen" })).toBeVisible();
-  await expect(page.getByText("Mistral", { exact: true })).toBeVisible();
+  await expect(page.getByText("Model voor OTHER-vervangingen", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Sluit instellingen" }).click();
   await expect(page.getByRole("dialog", { name: "Instellingen" })).not.toBeVisible();
 });
@@ -161,4 +161,48 @@ test("genereert een tweede lokale synthetische laag", async ({ page }) => {
   await expect(syntheticText).toHaveValue(/@/);
   await expect(page.getByText("Fictieve vervangers", { exact: false })).toBeVisible();
   await expect(page.getByText("EMAIL_1", { exact: true })).toBeVisible();
+});
+
+test("maakt een Overig-waarde uit de hint, zonder model", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Start een nieuwe controle/ }).click();
+  const editor = page.getByRole("textbox", { name: "Brontekst" });
+  await editor.fill("Klantcode ABC-1234 is bekend.");
+  await editor.evaluate((element) => {
+    const area = element as HTMLTextAreaElement;
+    const start = area.value.indexOf("ABC-1234");
+    area.setSelectionRange(start, start + "ABC-1234".length);
+  });
+  await page.getByLabel("Type handmatig label").selectOption("other");
+  await page.getByRole("button", { name: /Markering toevoegen/ }).click();
+  const candidate = page.locator(".candidate").filter({ hasText: "ABC-1234" });
+  await candidate.getByRole("button", { name: "Genereer token" }).click();
+  await page.getByRole("button", { name: "Kopieer veilige tekst" }).click();
+  const bevestigKopie = page.getByTestId("modal-ok");
+  if (await bevestigKopie.isVisible()) await bevestigKopie.click();
+  const copiedText = await page.evaluate(() => navigator.clipboard.readText());
+
+  await page.getByRole("button", { name: "02 Synthetisch" }).click();
+  const sourceText = page.getByRole("textbox", { name: "Veilige tekst voor synthetische laag" });
+  await sourceText.fill(copiedText);
+  const syntheticText = page.getByRole("textbox", { name: "Synthetische tekst" });
+  const formaatVeld = page.getByLabel("Gewenst formaat voor Overig");
+
+  // 1. Vorm volledig beschreven, prefix kent het register niet → één voorbeeld ter bevestiging.
+  await formaatVeld.fill("referentie met REF gevolgd door een punt en acht cijfers");
+  await page.getByRole("button", { name: /Genereer 1 Overig-item met AI/ }).click();
+  const modal = page.getByTestId("modal");
+  await expect(modal).toBeVisible();
+  await expect(modal.getByText(/Bedoel je zoiets: REF\.\d{8}\?/)).toBeVisible();
+  await page.getByTestId("modal-ok").click();
+  await expect(syntheticText).toHaveValue(/REF\.\d{8}/);
+  await expect(page.getByRole("textbox", { name: "Fictieve vervanger voor OTHER_1" })).toHaveValue(
+    /REF\.\d{8}/,
+  );
+
+  // 2. Bekende vorm: geen vraag, geen model — de app genereert direct.
+  await formaatVeld.fill("intern projectnummer met prefix PROJ- en vier cijfers");
+  await page.getByRole("button", { name: "Genereer OTHER_1 met lokale AI" }).click();
+  await expect(page.getByTestId("modal")).toHaveCount(0);
+  await expect(syntheticText).toHaveValue(/PROJ-\d{4}/);
 });

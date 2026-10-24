@@ -135,13 +135,13 @@ transactie TX-2025-04   -> TRANSACTION_1
 serienummer SN8844      -> SERIAL_1
 ```
 
-Dezelfde waarde krijgt binnen één actieve sessie hetzelfde token. Bij het sluiten van de app verdwijnt de mapping. Er is bewust nog geen vault, wachtwoordscherm, projectbestand of persistente opslag.
+Dezelfde combinatie van type en waarde krijgt binnen één actieve sessie hetzelfde token. Nummers worden na edits, negeren, undo of redo niet hergebruikt of verschoven. Bij het sluiten van de app verdwijnt de mapping. Er is bewust nog geen vault, wachtwoordscherm, projectbestand of persistente opslag.
 
 ## Synthetische tweede laag
 
-In tabblad `02 Synthetisch` plakt de gebruiker eerst zelf de veilige tekst uit laag 1. Alleen ondersteunde markers zoals `EMAIL_1`, `CUSTOMER_1` en `LINK_1` worden herkend; de tweede laag ontvangt geen bronwaarden uit de eerste laag. Na een expliciete klik worden de markers opnieuw opgebouwd als realistische, volledig fictieve waarden. Kies in de synthetische laag Nederlands of English. E-mailadressen, personen, telefoonnummers, IBAN's, BSN's, postcodes, datums, identifiers en links worden lokaal en deterministisch gegenereerd. De tekst wordt pas gekopieerd nadat alle vervangers zijn ingevuld.
+In tabblad `02 Synthetisch` plakt de gebruiker eerst zelf de veilige tekst uit laag 1. Alleen ondersteunde markers zoals `EMAIL_1`, `CUSTOMER_1` en `LINK_1` worden herkend; de tweede laag ontvangt geen bronwaarden uit de eerste laag. Na een expliciete klik worden de markers opnieuw opgebouwd als volledig fictieve waarden. Kies in de synthetische laag Nederlands of English. Domeinen komen uitsluitend uit de gereserveerde `example.*`-reeks; BSN- en IBAN-achtige waarden zijn opzettelijk ongeldig en secret-achtige waarden gebruiken herkenbare demoformaten. De tekst wordt pas gekopieerd nadat alle vervangers zijn ingevuld en opnieuw door de runtimevalidator is goedgekeurd.
 
-`OTHER` wordt niet willekeurig ingevuld. Hiervoor kan optioneel een lokaal Ollama-model worden gebruikt. De app communiceert hiervoor uitsluitend met `http://localhost:11434`; er worden geen cloudmodellen of externe endpoints ondersteund. De gekozen taal wordt ook aan de lokale prompt meegegeven. In de tweede laag kan de gebruiker het model en een gewenste formaatbeschrijving opgeven, bijvoorbeeld `intern projectnummer met prefix PROJ-`.
+`OTHER` wordt niet willekeurig ingevuld. Hiervoor kan optioneel het apart geselecteerde lokale Qwen-/Ollama-model worden gebruikt. Het request volgt [`model-prompt.md`](model-prompt.md), gebruikt `/api/chat` met `think:false` en wordt niet stil genormaliseerd: een contractfout of weigering wordt als fout getoond en nooit ingevuld. De app communiceert hiervoor uitsluitend met `http://localhost:11434`; er worden geen cloudmodellen of externe endpoints ondersteund.
 
 ## Lokale chat
 
@@ -153,12 +153,12 @@ De modelcatalogus kan optioneel modellen via Ollama downloaden. Voor elke downlo
 
 Open het tandwiel in de topbar om voorkeuren te beheren. De voorkeuren worden tussen appstarts lokaal bewaard:
 
-- automatisch Mistral met Gemma 3 1B als lichte fallback;
+- een expliciet model voor `OTHER` en een apart model voor algemene chat, zonder stille fallback;
 - taal voor synthetische waarden en lokale prompts;
 - automatische clipboard-cleartimer;
 - lokale modellen verversen en nieuwe modellen downloaden.
 
-In de chat toont de modelbadge welk lokaal model actief is. Mistral en compatibele Mistral-varianten zoals `dolphin-mistral:latest` krijgen voorrang; Gemma 3 1B wordt automatisch gebruikt als fallback. Alleen voorkeuren worden persistent opgeslagen. Brondata, mappings en chatgeschiedenis blijven sessiegebonden.
+In de chat toont de modelbadge welk lokaal model geselecteerd is. Als een geselecteerd model ontbreekt, geeft de app een fout en kiest hij niet automatisch een alternatief. Alleen voorkeuren worden persistent opgeslagen. Brondata, mappings en chatgeschiedenis blijven sessiegebonden.
 
 ## Technologie
 
@@ -188,7 +188,7 @@ Ollama wordt niet meegeleverd met de macOS-app. Zonder Ollama blijven Review, Te
 1. Installeer Ollama voor macOS via [ollama.com/download/mac](https://ollama.com/download/mac).
 2. Open Ollama één keer zodat de lokale server draait.
 3. Open in Amnesia Protocol `Instellingen` en klik op `Ververs lokale modellen`.
-4. Installeer eventueel Mistral of de lichte Gemma 3 1B-fallback vanuit hetzelfde instellingenpaneel.
+4. Selecteer afzonderlijk een lokaal model voor `OTHER` en voor algemene chat.
 
 De app communiceert alleen met Ollama op `http://localhost:11434`. Modeldownloads zijn de enige optionele actie die een internetverbinding gebruikt. Als Ollama niet aanwezig is, toont Instellingen een korte onboarding met deze stappen.
 
@@ -202,11 +202,11 @@ Optionele lokale AI instellen:
 
 ```bash
 ollama serve
+ollama pull qwen3.5:4b
 ollama pull mistral
-ollama pull gemma3:1b
 ```
 
-De tweede laag gebruikt automatisch een lokaal Mistral-model, inclusief compatibele varianten zoals `dolphin-mistral:latest`. Als geen Mistral-variant beschikbaar is, valt de app terug op het lichte `gemma3:1b`-model. Via `Ververs lokale Ollama-modellen` worden alleen lokaal geïnstalleerde modellen gecontroleerd. Vanuit Instellingen kunnen Mistral of de fallback expliciet worden gedownload, met een waarschuwing voor downloadgrootte en aanbevolen RAM. De app gebruikt uitsluitend Ollama op `http://localhost:11434`; zonder Ollama blijven alle standaardvervangers volledig offline beschikbaar.
+De tweede laag gebruikt standaard `amnesia-qwen:4b`, de lokale naam van het later geëxporteerde en gekwantiseerde model. Voor S0 kan `qwen3.5:4b` expliciet worden gekozen. Chat heeft een eigen modelkeuze. Via `Ververs lokale Ollama-modellen` worden alleen lokaal geïnstalleerde modellen gecontroleerd; ontbrekende modellen veroorzaken een zichtbare fout en nooit een stille fallback. De app gebruikt uitsluitend Ollama op `http://localhost:11434`; zonder Ollama blijven alle standaardvervangers volledig offline beschikbaar.
 
 Start de webontwikkelserver:
 

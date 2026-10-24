@@ -3,6 +3,7 @@ import { useRef, type RefObject, type ReactNode } from "react";
 import type { ReviewAction } from "./review";
 import type { Detection, DetectionType } from "./types";
 import { TYPE_LABELS } from "./types";
+import { tokenIdentity } from "./tokenRegistry";
 
 type ReviewWorkspaceProps = {
   text: string;
@@ -173,10 +174,10 @@ export function ReviewWorkspace({
               </div>
               <div className="candidate-value">{item.value}</div>
               {(item.decision === "accepted" || item.decision === "edited") &&
-                tokens.has(item.value) && (
+                tokens.has(tokenIdentity(item.type, item.value)) && (
                   <div className="candidate-token" data-testid={`token-${item.id}`}>
                     <span>VERVANGER</span>
-                    <code>{tokens.get(item.value)}</code>
+                    <code>{tokens.get(tokenIdentity(item.type, item.value))}</code>
                   </div>
                 )}
               <div className="candidate-actions">

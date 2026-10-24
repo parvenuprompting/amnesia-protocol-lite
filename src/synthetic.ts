@@ -35,155 +35,23 @@ const MARKER_TYPES: Record<string, DetectionType> = {
   CLOUDRESOURCE: "cloudResource",
 };
 
-const FIRST_NAMES_NL = [
-  "Liam",
-  "Emma",
-  "Lucas",
-  "Mila",
-  "Noah",
-  "Sofia",
-  "Daan",
-  "Julia",
-  "Sem",
-  "Anna",
-  "Milan",
-  "Tess",
-  "Luuk",
-  "Zoë",
-  "Jayden",
-  "Eva",
-  "Tim",
-  "Fleur",
-  "Thomas",
-  "Sanne",
-];
+const FIRST_NAMES_NL = ["Voorbeeld", "Fictief", "Test"];
 
-const LAST_NAMES_NL = [
-  "Jansen",
-  "Bakker",
-  "Visser",
-  "Smit",
-  "Mulder",
-  "Boer",
-  "De Groot",
-  "De Jong",
-  "Peters",
-  "Van Dijk",
-  "Van den Berg",
-  "Bos",
-  "Verhoeven",
-  "De Vries",
-  "Dekker",
-  "Hendriks",
-  "Van Leeuwen",
-  "Jacobs",
-  "Brouwer",
-  "Meijer",
-];
+const LAST_NAMES_NL = ["Persoon", "Gebruiker", "Contact"];
 
-const STREET_NAMES_NL = [
-  "Lindelaan",
-  "Oranjelaan",
-  "Kerkstraat",
-  "Schoolstraat",
-  "Dorpsstraat",
-  "Hoofdstraat",
-  "Stationsweg",
-  "Molenstraat",
-  "Eikenlaan",
-  "Van Breestraat",
-];
+const STREET_NAMES_NL = ["Voorbeeldstraat", "Fictiefplein", "Testlaan"];
 
-const CITIES_NL = [
-  "Amsterdam",
-  "Rotterdam",
-  "Den Haag",
-  "Utrecht",
-  "Eindhoven",
-  "Groningen",
-  "Tilburg",
-  "Breda",
-  "Nijmegen",
-  "Apeldoorn",
-];
+const CITIES_NL = ["Voorbeeldstad", "Fictiefdorp", "Testdam"];
 
-const DOMAINS_NL = ["voorbeeld.nl", "fictief.nl", "demo-org.nl", "example.nl", "testbedrijf.nl"];
+const RESERVED_DOMAINS = ["example.com", "example.net", "example.org", "example.invalid"];
 
-const FIRST_NAMES_EN = [
-  "Oliver",
-  "Amelia",
-  "George",
-  "Isla",
-  "Harry",
-  "Emily",
-  "Jack",
-  "Ava",
-  "Noah",
-  "Isabella",
-  "Arthur",
-  "Mia",
-  "Leo",
-  "Grace",
-  "Oscar",
-  "Lily",
-  "Henry",
-  "Ella",
-  "Charlie",
-  "Sophie",
-];
+const FIRST_NAMES_EN = ["Example", "Fictional", "Test"];
 
-const LAST_NAMES_EN = [
-  "Smith",
-  "Jones",
-  "Taylor",
-  "Brown",
-  "Davies",
-  "Wilson",
-  "Evans",
-  "Thomas",
-  "Roberts",
-  "Johnson",
-  "Lewis",
-  "Walker",
-  "Robinson",
-  "Wood",
-  "Thompson",
-  "White",
-  "Watson",
-  "Wright",
-];
+const LAST_NAMES_EN = ["Person", "User", "Contact"];
 
-const STREET_NAMES_EN = [
-  "Baker Street",
-  "King Street",
-  "Church Road",
-  "Victoria Road",
-  "Station Road",
-  "Park Lane",
-  "High Street",
-  "Mill Road",
-  "Queen Street",
-  "Oak Avenue",
-];
+const STREET_NAMES_EN = ["Example Street", "Fictional Road", "Test Avenue"];
 
-const CITIES_EN = [
-  "London",
-  "Manchester",
-  "Birmingham",
-  "Leeds",
-  "Bristol",
-  "Liverpool",
-  "Oxford",
-  "Cambridge",
-];
-
-const DOMAINS_EN = [
-  "example.com",
-  "fictional.co.uk",
-  "demo-org.com",
-  "sample.net",
-  "test-company.co.uk",
-];
+const CITIES_EN = ["Example City", "Fictional Town", "Testville"];
 
 const LINK_PATHS = [
   "/mijn-account",
@@ -260,41 +128,28 @@ export function isValidBSN(value: string): boolean {
 }
 
 export function generateBSN(rng: SeededRandom): string {
-  for (let attempts = 0; attempts < 1000; attempts++) {
-    const candidate = rng.digits(9);
-    if (isValidBSN(candidate)) return candidate;
+  let candidate = rng.digits(9);
+  while (isValidBSN(candidate)) {
+    candidate = `${candidate.slice(0, -1)}${(Number(candidate.at(-1)) + 1) % 10}`;
   }
-  return "111222333";
+  return candidate;
 }
 
 export function generateIBAN(rng: SeededRandom): string {
-  const bankCode = rng.chars(4);
-  const account = rng.digits(10);
-  const bban = bankCode + account;
-  const numeric = bban.split("").reduce((acc, char) => {
-    const code = char.charCodeAt(0);
-    return acc + (code >= 65 ? String(code - 55) : char);
-  }, "");
-  const modInput = numeric + "232100";
-  let remainder = 0;
-  for (let i = 0; i < modInput.length; i += 7) {
-    remainder = Number(String(remainder) + modInput.slice(i, i + 7)) % 97;
-  }
-  const check = String(98 - remainder).padStart(2, "0");
-  const iban = `NL${check}${bban}`;
+  const iban = `NL00TEST${rng.digits(10)}`;
   return `${iban.slice(0, 4)} ${iban.slice(4, 8)} ${iban.slice(8, 12)} ${iban.slice(12, 16)} ${iban.slice(16, 18)}`;
 }
 
 function formatPostcode(rng: SeededRandom, locale: SyntheticLocale): string {
-  if (locale === "en") return rng.digits(5);
-  const digits = rng.digits(4);
+  if (locale === "en") return `000${rng.digits(2)}`;
+  const digits = `000${rng.int(0, 9)}`;
   const letters = rng.chars(2).replace(/O/g, "P");
   return `${digits} ${letters}`;
 }
 
 function formatAddress(rng: SeededRandom, locale: SyntheticLocale): string {
   const streets = locale === "en" ? STREET_NAMES_EN : STREET_NAMES_NL;
-  return `${rng.pick(streets)} ${rng.int(1, 198)}`;
+  return `${rng.pick(streets)} 0`;
 }
 
 function formatPostcodeWithCity(rng: SeededRandom, locale: SyntheticLocale): string {
@@ -303,10 +158,8 @@ function formatPostcodeWithCity(rng: SeededRandom, locale: SyntheticLocale): str
 }
 
 function formatPhone(rng: SeededRandom, locale: SyntheticLocale): string {
-  const number = rng.int(10000000, 99999999);
-  const str = String(number);
-  if (locale === "en") return `+1 202 ${str.slice(0, 3)} ${str.slice(3, 7)}`;
-  return `06 ${str.slice(0, 2)} ${str.slice(2, 4)} ${str.slice(4, 6)} ${str.slice(6, 8)}`;
+  if (locale === "en") return `+1 202 555 01${rng.digits(2)}`;
+  return `+31 00 0000 ${rng.digits(4)}`;
 }
 
 function formatDate(rng: SeededRandom, locale: SyntheticLocale): string {
@@ -328,7 +181,7 @@ export function generateSyntheticValue(
 ): string | null {
   const firstNames = locale === "en" ? FIRST_NAMES_EN : FIRST_NAMES_NL;
   const lastNames = locale === "en" ? LAST_NAMES_EN : LAST_NAMES_NL;
-  const domains = locale === "en" ? DOMAINS_EN : DOMAINS_NL;
+  const domains = RESERVED_DOMAINS;
   switch (type) {
     case "person": {
       const first = rng.pick(firstNames);
@@ -365,7 +218,7 @@ export function generateSyntheticValue(
     case "date":
       return formatDate(rng, locale);
     case "customer":
-      return rng.digits(9);
+      return generateBSN(rng);
     case "transaction":
       return `2003${rng.digits(7)}`;
     case "serial":
@@ -373,37 +226,33 @@ export function generateSyntheticValue(
     case "reference":
       return `${rng.digits(2)}.${rng.digits(3)}.${rng.digits(3)}`;
     case "link": {
-      const domain = rng.pick(domains).replace(/^www\./, "");
+      const domain = rng.pick(domains);
       const path = rng.pick(locale === "en" ? LINK_PATHS_EN : LINK_PATHS);
-      return `https://www.${domain}${path}`;
+      return `https://${domain}${path}`;
     }
     case "apiKey":
-      return `AKIA${rng.chars(16)}`;
+      return `demo_api_${rng.chars(12).toLowerCase()}`;
     case "accessToken":
-      return `tok_${rng.chars(28).toLowerCase()}${rng.digits(4)}`;
+      return `demo_token_${rng.chars(12).toLowerCase()}`;
     case "jwt":
-      return `eyJ${rng.chars(18)}.${rng.chars(24)}.${rng.chars(32)}`;
+      return `demo_jwt_${rng.chars(12).toLowerCase()}`;
     case "privateKey":
-      return "-----BEGIN PRIVATE KEY-----\nSYNTHETIC-KEY-DATA\n-----END PRIVATE KEY-----";
+      return `SYNTHETIC_PRIVATE_KEY_${rng.chars(8)}`;
     case "credentialUrl":
-      return locale === "en"
-        ? "postgresql://fictional:demo-password@localhost:5432/example"
-        : "postgresql://fictief:demo-wachtwoord@localhost:5432/voorbeeld";
+      return "postgresql://demo:demo@example.invalid:5432/example";
     case "secret":
-      return `secret_${rng.chars(18).toLowerCase()}`;
+      return `demo_value_${rng.chars(12).toLowerCase()}`;
     case "account": {
       const first = rng.pick(firstNames).toLowerCase();
       const last = rng.pick(lastNames).toLowerCase().replace(/\s+/g, "-");
-      return `${first}.${last}`;
+      return `${first}_${last}`;
     }
     case "path": {
       const account = generateSyntheticValue("account", value, rng, locale) ?? "synthetic-user";
       return locale === "en" ? `/Users/${account}/project` : `/Users/${account}/project`;
     }
     case "gitRemote":
-      return locale === "en"
-        ? "git@github.com:example-org/demo-repo.git"
-        : "git@github.com:voorbeeld-org/demo-repo.git";
+      return "https://example.invalid/example-org/demo-repo";
     case "cloudResource":
       return `arn:aws:s3:::synthetic-bucket-${rng.digits(6)}`;
     case "other":

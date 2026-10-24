@@ -10,25 +10,7 @@ import {
 } from "./review";
 import type { Detection, DetectionType } from "./types";
 import { TYPE_LABELS } from "./types";
-
-function tokenFor(type: DetectionType, index: number) {
-  return `${type.toUpperCase()}_${index}`;
-}
-
-function createTokens(items: Detection[]) {
-  const counts = new Map<DetectionType, number>();
-  const mapping = new Map<string, string>();
-  items
-    .filter((item) => item.decision === "accepted" || item.decision === "edited")
-    .forEach((item) => {
-      if (!mapping.has(item.value)) {
-        const index = (counts.get(item.type) ?? 0) + 1;
-        counts.set(item.type, index);
-        mapping.set(item.value, tokenFor(item.type, index));
-      }
-    });
-  return mapping;
-}
+import { assignStableTokens, createTokenRegistry } from "./tokenRegistry";
 
 type UseReviewStateOptions = {
   initialText: string;
@@ -53,6 +35,7 @@ export function useReviewState({
   const [selectedType, setSelectedType] = useState<DetectionType>("person");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textEditVersionRef = useRef(0);
+  const tokenRegistryRef = useRef(createTokenRegistry());
   const maxHistoryEntries = 50;
 
   const pushHistory = (snapshot: ReviewSnapshot) => {
@@ -180,6 +163,7 @@ export function useReviewState({
     setHistory([]);
     setFuture([]);
     setTextEditBaseline(null);
+    tokenRegistryRef.current = createTokenRegistry();
   };
 
   const acceptPending = async () => {
@@ -222,7 +206,10 @@ export function useReviewState({
     onToast(`${current.length} kandidaten geaccepteerd`);
   };
 
-  const tokens = useMemo(() => createTokens(detections), [detections]);
+  const tokens = useMemo(
+    () => assignStableTokens(detections, tokenRegistryRef.current),
+    [detections],
+  );
   const pending = detections.filter((item) => item.decision === "pending").length;
   const filtered = detections.filter(
     (item) =>
@@ -238,7 +225,7 @@ export function useReviewState({
   const prepareOutput = () => {
     const currentDetections = freshDetections();
     if (textEditBaseline) commitDetections(currentDetections);
-    const currentTokens = createTokens(currentDetections);
+    const currentTokens = assignStableTokens(currentDetections, tokenRegistryRef.current);
     return {
       text,
       detections: currentDetections,

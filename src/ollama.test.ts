@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   chatWithOllama,
+  buildReplacementRequest,
   generateWithOllama,
   listOllamaModels,
   pullOllamaModel,
-  resolveOllamaModel,
-  normalizeGeneratedValue,
 } from "./ollama";
 
 describe("generateWithOllama", () => {
@@ -14,7 +13,9 @@ describe("generateWithOllama", () => {
   it("sends only the synthetic marker and format hint to the local model", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response(JSON.stringify({ response: "PROJ-4821" }), { status: 200 }));
+      .mockResolvedValue(
+        new Response(JSON.stringify({ message: { content: "PROJ-4821" } }), { status: 200 }),
+      );
 
     const result = await generateWithOllama(
       "OTHER_1",
@@ -24,24 +25,27 @@ describe("generateWithOllama", () => {
     const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
 
     expect(result).toBe("PROJ-4821");
-    expect(fetchMock.mock.calls[0][0]).toBe("http://localhost:11434/api/generate");
-    expect(request.model).toBe("llama3.2");
-    expect(request.prompt).toContain("Marker: OTHER_1");
-    expect(request.prompt).toContain("PROJ-");
-    expect(request.prompt).not.toContain("klant@example.com");
+    expect(fetchMock.mock.calls[0][0]).toBe("http://localhost:11434/api/chat");
+    expect(request).toEqual(
+      buildReplacementRequest("OTHER_1", "intern projectnummer met prefix PROJ-", "llama3.2", "nl"),
+    );
+    expect(request.think).toBe(false);
+    expect(request).not.toHaveProperty("prompt");
   });
 
   it("uses the selected English language in the local prompt", async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(JSON.stringify({ response: "Fictional Project" }), { status: 200 }),
-      );
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ message: { content: "Fictional Project" } }), {
+        status: 200,
+      }),
+    );
 
     await generateWithOllama("OTHER_1", "fictional project name", "llama3.2", undefined, "en");
     const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
 
-    expect(request.prompt).toContain("in English");
+    expect(request.messages[1].content).toBe(
+      "Marker: OTHER_1\nTaal: English\nGewenst formaat: fictional project name",
+    );
   });
 
   it("lists local models from Ollama", async () => {
@@ -103,6 +107,8 @@ describe("generateWithOllama", () => {
       ),
     ).resolves.toBe("Hallo wereld");
     expect(chunks).toEqual(["Hallo", " wereld"]);
+    const request = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    expect(request.think).toBe(false);
   });
 
   it("preserves the Ollama error when a model is missing", async () => {
@@ -118,30 +124,23 @@ describe("generateWithOllama", () => {
     ).rejects.toThrow("model 'llama3.2' not found");
   });
 
-  it("normalizes explanatory and fenced OTHER responses", () => {
-    expect(normalizeGeneratedValue("Hier is de waarde: `PROJ-4821`\nGebruik deze waarde.")).toBe(
-      "PROJ-4821",
+  it("rejects contract violations instead of normalizing them", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ message: { content: "Hier is de waarde: PROJ-4821." } }), {
+        status: 200,
+      }),
     );
-    expect(normalizeGeneratedValue("```text\nfictional@example.com\n``` ")).toBe(
-      "fictional@example.com",
+    await expect(generateWithOllama("OTHER_1", "project", "qwen")).rejects.toThrow(
+      "eindigen op een punt",
     );
   });
 
-  it("accepts Dolphin Mistral as a primary Mistral-family model", () => {
-    expect(
-      resolveOllamaModel([{ name: "dolphin-mistral:latest", parameterSize: "7B" }]),
-    ).toMatchObject({
-      name: "dolphin-mistral:latest",
-      fallback: false,
-      label: "Dolphin Mistral",
-    });
-  });
-
-  it("uses Gemma 3 1B only when no Mistral-family model is installed", () => {
-    expect(resolveOllamaModel([{ name: "gemma3:1b", parameterSize: "1B" }])).toMatchObject({
-      name: "gemma3:1b",
-      fallback: true,
-      label: "Gemma 3 1B",
-    });
+  it("rejects thinking output even when the content itself is valid", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ message: { thinking: "reasoning", content: "PROJ-4821" } }), {
+        status: 200,
+      }),
+    );
+    await expect(generateWithOllama("OTHER_1", "project", "qwen")).rejects.toThrow("thinking-blok");
   });
 });

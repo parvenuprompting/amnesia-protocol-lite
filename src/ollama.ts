@@ -1,8 +1,11 @@
 import type { SyntheticLocale } from "./synthetic";
 import type { ChatMessage } from "./chat";
+import { buildReplacementUserMessage, REPLACEMENT_SYSTEM_PROMPT } from "./modelPrompt";
+import { assertSyntheticValue } from "./syntheticSafety";
 
-export type OllamaGenerateResponse = {
-  response?: string;
+export type OllamaReplacementResponse = {
+  message?: { content?: string; thinking?: string };
+  thinking?: string;
 };
 
 export const OLLAMA_REQUEST_TIMEOUT_MS = 30_000;
@@ -24,25 +27,6 @@ async function fetchOllama(
   } finally {
     window.clearTimeout(timeout);
   }
-}
-
-export function normalizeGeneratedValue(raw: string): string {
-  const withoutFence = raw
-    .trim()
-    .replace(/^```(?:text|plaintext)?\s*/i, "")
-    .replace(/\s*```$/i, "");
-  const firstLine =
-    withoutFence
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .find(Boolean) ?? "";
-  return firstLine
-    .replace(
-      /^(?:here is (?:the )?value|hier is (?:de )?waarde|replacement|vervanging)\s*:\s*/i,
-      "",
-    )
-    .replace(/^['"`]+|['"`]+$/g, "")
-    .trim();
 }
 
 export type OllamaLocalModel = {
@@ -81,15 +65,18 @@ export type OllamaCatalogModel = {
   description: string;
 };
 
+export const REPLACEMENT_OLLAMA_MODEL = "amnesia-qwen:4b";
 export const PRIMARY_OLLAMA_MODEL = "mistral:latest";
-export const FALLBACK_OLLAMA_MODEL = "gemma3:1b";
-export const MISTRAL_MODEL_ALIASES = [
-  "mistral:latest",
-  "mistral",
-  "dolphin-mistral:latest",
-] as const;
+export const LIGHTWEIGHT_CHAT_MODEL = "gemma3:1b";
 
 export const OLLAMA_CATALOG: OllamaCatalogModel[] = [
+  {
+    name: "qwen3.5:4b",
+    label: "Qwen 3.5 4B (basis)",
+    downloadSize: "~3 GB",
+    recommendedRam: "8 GB RAM",
+    description: "Basismodel voor de lokale OTHER-modelproef; niet de getrainde Amnesia-adapter.",
+  },
   {
     name: PRIMARY_OLLAMA_MODEL,
     label: "Mistral",
@@ -98,69 +85,76 @@ export const OLLAMA_CATALOG: OllamaCatalogModel[] = [
     description: "Primair model voor chat en OTHER-vervangingen.",
   },
   {
-    name: FALLBACK_OLLAMA_MODEL,
+    name: LIGHTWEIGHT_CHAT_MODEL,
     label: "Gemma 3 1B",
     downloadSize: "~0.8 GB",
     recommendedRam: "4 GB RAM",
-    description: "Lichte fallback voor kleinere Macs of wanneer Mistral ontbreekt.",
+    description: "Licht chatmodel voor kleinere Macs.",
   },
 ];
-
-export function resolveOllamaModel(models: OllamaLocalModel[]) {
-  const primary = models.find((model) =>
-    MISTRAL_MODEL_ALIASES.includes(model.name as (typeof MISTRAL_MODEL_ALIASES)[number]),
-  );
-  if (primary) {
-    return {
-      ...primary,
-      fallback: false,
-      label: primary.name === "dolphin-mistral:latest" ? "Dolphin Mistral" : "Mistral",
-    };
-  }
-  const fallback = models.find((model) => model.name === FALLBACK_OLLAMA_MODEL);
-  return fallback ? { ...fallback, fallback: true, label: "Gemma 3 1B" } : null;
-}
-
-export function hasMistralModel(models: OllamaLocalModel[]) {
-  return models.some((model) =>
-    MISTRAL_MODEL_ALIASES.includes(model.name as (typeof MISTRAL_MODEL_ALIASES)[number]),
-  );
-}
 
 export async function generateWithOllama(
   marker: string,
   formatHint: string,
   model: string,
-  endpoint = "http://localhost:11434/api/generate",
+  endpoint = "http://localhost:11434/api/chat",
   locale: SyntheticLocale = "nl",
+  seed?: number,
 ): Promise<string> {
-  const language = locale === "en" ? "English" : "Nederlands";
-  const formatInstruction = formatHint.trim()
-    ? `Gebruik dit gewenste formaat of deze beschrijving: ${formatHint.trim()}`
-    : "Behoud het soort waarde en de globale vorm van het origineel.";
-  const prompt = [
-    `Genereer voor de volgende marker een realistische, volledig fictieve waarde in ${language}.`,
-    "Geef uitsluitend de vervangende waarde terug, zonder uitleg, aanhalingstekens of opmaak.",
-    formatInstruction,
-    `Marker: ${marker}`,
-  ].join("\n");
+  const request = buildReplacementRequest(marker, formatHint, model, locale, seed);
 
   const response = await fetchOllama(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, prompt, stream: false }),
+    body: JSON.stringify(request),
   });
 
   if (!response.ok) {
     throw await ollamaHttpError(response);
   }
 
-  const payload = (await response.json()) as OllamaGenerateResponse;
-  const generated = payload.response ? normalizeGeneratedValue(payload.response) : "";
+  const payload = (await response.json()) as OllamaReplacementResponse;
+  if (payload.thinking?.trim() || payload.message?.thinking?.trim()) {
+    throw new Error("Ollama gaf ondanks think:false een thinking-blok terug");
+  }
+  const generated = payload.message?.content ?? "";
   if (!generated) {
     throw new Error("Ollama gaf geen vervangende waarde terug");
   }
-  return generated;
+  if (/<\/?think(?:ing)?\b/i.test(generated)) {
+    throw new Error("Ollama gaf ondanks think:false een thinking-blok terug");
+  }
+  return assertSyntheticValue(generated, locale);
+}
+
+export function buildReplacementRequest(
+  marker: string,
+  formatHint: string,
+  model: string,
+  locale: SyntheticLocale = "nl",
+  seed?: number,
+) {
+  const options: {
+    temperature: number;
+    top_p: number;
+    num_ctx: number;
+    num_predict: number;
+    seed?: number;
+  } = { temperature: 0.1, top_p: 0.9, num_ctx: 2048, num_predict: 32 };
+  if (seed !== undefined) options.seed = seed;
+  return {
+    model,
+    messages: [
+      { role: "system" as const, content: REPLACEMENT_SYSTEM_PROMPT },
+      {
+        role: "user" as const,
+        content: buildReplacementUserMessage(marker, formatHint, locale),
+      },
+    ],
+    think: false as const,
+    stream: false as const,
+    options,
+  };
 }
 
 export async function listOllamaModels(
@@ -234,6 +228,7 @@ export async function chatWithOllama(
     body: JSON.stringify({
       model,
       messages,
+      think: false,
       stream: true,
       options: {
         num_ctx: options.numCtx,

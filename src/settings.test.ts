@@ -21,6 +21,8 @@ describe("persistent settings", () => {
     const settings = {
       syntheticLocale: "en" as const,
       clipboardClearAfter: 30_000 as const,
+      replacementModel: "amnesia-qwen:4b",
+      chatModel: "qwen3:4b",
     };
     saveSettings(settings, storage);
     expect(loadSettings(storage)).toEqual(settings);

@@ -1,14 +1,22 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const nodeProcess = (
+  globalThis as typeof globalThis & {
+    process?: { env?: { E2E_PORT?: string } };
+  }
+).process;
+const port = nodeProcess?.env?.E2E_PORT ?? "4173";
+const baseURL = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: "./e2e",
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL,
     permissions: ["clipboard-read", "clipboard-write"],
   },
   webServer: {
-    command: "npm run dev -- --host 127.0.0.1 --port 4173",
-    url: "http://127.0.0.1:4173",
+    command: `npm run dev -- --host 127.0.0.1 --port ${port}`,
+    url: baseURL,
     timeout: 120000,
     reuseExistingServer: true,
   },

@@ -1,4 +1,5 @@
 import { resolveOverlaps } from "./detectors";
+import { tokenIdentity } from "./tokenRegistry";
 import type { Decision, Detection, DetectionType } from "./types";
 
 export type ReviewAction = { id: string; decision: Decision; value?: string; type?: DetectionType };
@@ -95,7 +96,7 @@ export function replaceAccepted(
     .reduce(
       (result, item) =>
         result.slice(0, item.start) +
-        (tokens.get(item.value) ?? item.value) +
+        (tokens.get(tokenIdentity(item.type, item.value)) ?? item.value) +
         result.slice(item.end),
       text,
     );

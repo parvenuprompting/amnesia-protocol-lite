@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import packageJson from "../package.json";
 import { Check, Eraser, EyeOff, RotateCcw, RotateCw, Settings } from "lucide-react";
 import { AppDialog } from "./AppDialog";
@@ -14,15 +14,15 @@ import {
 } from "./chat";
 import { ChatPanel } from "./ChatPanel";
 import { detectTerminal } from "./detectors";
+import { detectFormat } from "./formatDetect";
+import { DocumentSession, FormatSpaceExhaustedError, type FormatSpec } from "./formats";
 import { HomeScreen } from "./HomeScreen";
 import {
   generateWithOllama,
   chatWithOllama,
   listOllamaModels,
   OLLAMA_CATALOG,
-  PRIMARY_OLLAMA_MODEL,
   pullOllamaModel,
-  resolveOllamaModel,
   type OllamaPullProgress,
 } from "./ollama";
 import { ReviewBottomBar } from "./ReviewBottomBar";
@@ -30,6 +30,7 @@ import { ReviewWorkspace } from "./ReviewWorkspace";
 import { SettingsPanel } from "./SettingsPanel";
 import { SyntheticPanel, type SyntheticEntry } from "./SyntheticPanel";
 import { createSyntheticMap, parseSyntheticMarkers, replaceSyntheticMarkers } from "./synthetic";
+import { validateSyntheticValue } from "./syntheticSafety";
 import { useDialog } from "./useDialog";
 import { useClipboard } from "./useClipboard";
 import { reviewTypeOptions, useReviewState } from "./useReviewState";
@@ -64,7 +65,37 @@ function App() {
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState("");
   const [sessionSeed] = useState(() => Date.now());
+  // Eén sessie per geladen document. De sleutel is het markertoken (OTHER_1), niet het origineel:
+  // dat is op dit moment al door het token vervangen en dus niet meer beschikbaar.
+  const documentSessionRef = useRef<DocumentSession | null>(null);
+  if (documentSessionRef.current === null) {
+    documentSessionRef.current = new DocumentSession(sessionSeed, syntheticInput);
+  }
   const { dialog, askConfirm, askPrompt } = useDialog();
+  // Eén bevestiging per hinttekst, niet per marker: "Genereer alle Overig-items" loopt over alle
+  // items heen en zou anders voor elk item dezelfde vraag stellen.
+  const formaatBevestigingRef = useRef<{ hint: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    documentSessionRef.current?.issuer.setDocumentText(syntheticInput);
+  }, [syntheticInput]);
+
+  // Nieuw document: de vervangwaarden en de uitgever gaan samen opnieuw. Anders erft OTHER_1 in
+  // document B de waarde uit document A.
+  const startNewDocument = useCallback(
+    (text: string) => {
+      documentSessionRef.current?.beginDocument(text);
+      setSyntheticValues(new Map());
+      setAiError("");
+    },
+    [setAiError, setSyntheticValues],
+  );
+
+  useEffect(() => {
+    if (syntheticInput.trim() === "" && syntheticValues.size > 0) {
+      startNewDocument("");
+    }
+  }, [syntheticInput, syntheticValues, startNewDocument]);
 
   const showToast = (msg: string) => {
     setMessage(msg);
@@ -88,7 +119,10 @@ function App() {
       : "RAM niet beschikbaar via macOS-webview";
     return `${cores}, ${memory}`;
   }, []);
-  const activeModel = useMemo(() => resolveOllamaModel(localModels), [localModels]);
+  const replacementModelInstalled = localModels.some(
+    (model) => model.name === settings.replacementModel,
+  );
+  const chatModelInstalled = localModels.some((model) => model.name === settings.chatModel);
 
   useEffect(() => {
     if (!feedbackVisible) return;
@@ -141,9 +175,51 @@ function App() {
     showToast(`${generated.size} standaardvervanger${generated.size === 1 ? "" : "s"} gegenereerd`);
   };
 
+  /**
+   * Genereert de waarde uit een bekend of voorgesteld formaat. Geeft `true` als de waarde gezet is
+   * (of als de melding gezet is) — dan hoeft de modelroute niet meer te draaien.
+   */
+  const generateFromFormat = (entry: SyntheticEntry, spec: FormatSpec): boolean => {
+    try {
+      // Sleutel is het markertoken, net als op de modelroute: het origineel is al vervangen.
+      const waarde = documentSessionRef.current?.issuer.issue(spec, entry.token);
+      if (!waarde) return false;
+      setSyntheticValues((current) => new Map(current).set(entry.token, waarde));
+      setAiError("");
+      return true;
+    } catch (error) {
+      if (error instanceof FormatSpaceExhaustedError) setAiError(error.userMessage);
+      else setAiError(error instanceof Error ? error.message : "Onbekende fout bij genereren");
+      return true;
+    }
+  };
+
   const generateOther = async (entry: SyntheticEntry) => {
-    if (!activeModel) {
-      setAiError("Installeer eerst Mistral of Gemma 3 1B via Instellingen.");
+    // Eerst de detectielaag. Kent de app de vorm, dan genereert de app zelf en komt het model er
+    // niet aan te pas. Bij een vorm die niet in het register staat maar wél volledig te lezen is,
+    // vraagt de app één keer om bevestiging met een voorbeeldwaarde.
+    const detectie = detectFormat(otherFormatHint);
+    if (detectie.status === "known" || detectie.status === "proposed") {
+      let bevestigd = detectie.status === "known";
+      if (detectie.status === "proposed") {
+        const eerder = formaatBevestigingRef.current;
+        if (eerder && eerder.hint === otherFormatHint) {
+          bevestigd = eerder.ok;
+        } else {
+          bevestigd = await askConfirm(
+            `Bedoel je zoiets: ${detectie.example}? Dan maakt de app de waarde zelf, zonder model.`,
+            "Formaat bevestigen",
+          );
+          formaatBevestigingRef.current = { hint: otherFormatHint, ok: bevestigd };
+        }
+      }
+      if (bevestigd && generateFromFormat(entry, detectie.spec)) return;
+    }
+
+    if (ollamaStatus === "ready" && !replacementModelInstalled) {
+      setAiError(
+        `Het geselecteerde vervangingsmodel ${settings.replacementModel} is niet lokaal geïnstalleerd. Kies een ander model in Instellingen.`,
+      );
       return;
     }
     setAiBusy(true);
@@ -152,12 +228,34 @@ function App() {
       const replacement = await generateWithOllama(
         entry.token,
         otherFormatHint,
-        activeModel.name,
+        settings.replacementModel,
         undefined,
         settings.syntheticLocale,
       );
-      setSyntheticValues((current) => new Map(current).set(entry.token, replacement));
+      // Keuring op dubbel, in-document en leeg. De sleutel is het markertoken: het origineel is al
+      // door dat token vervangen, dus de documentcontrole gaat over de gemarkeerde tekst — niet over
+      // gelijkheid met een origineel dat al uit de tekst verdwenen is.
+      const keuring = documentSessionRef.current?.issuer.acceptModelValue(replacement, {
+        token: entry.token,
+      });
+      if (keuring && !keuring.ok) {
+        const uitleg: Record<typeof keuring.reason, string> = {
+          leeg: "Het model gaf geen bruikbare waarde terug.",
+          dubbel: "Het model gaf een waarde die al eerder in deze sessie is gebruikt.",
+          "in-document": "Het model gaf een waarde die al in het document staat.",
+          formaat: "De waarde past niet op het gevraagde formaat.",
+        };
+        setAiError(`${uitleg[keuring.reason]} Probeer het opnieuw.`);
+        return;
+      }
+      setSyntheticValues((current) =>
+        new Map(current).set(entry.token, keuring?.value ?? replacement),
+      );
     } catch (error) {
+      if (error instanceof FormatSpaceExhaustedError) {
+        setAiError(error.userMessage);
+        return;
+      }
       const errorMessage = error instanceof Error ? error.message : "Onbekende Ollama-fout";
       setAiError(
         `${errorMessage}. Controleer of Ollama draait en het model lokaal beschikbaar is.`,
@@ -188,7 +286,7 @@ function App() {
   }, [refreshModels, settingsOpen]);
 
   useEffect(() => {
-    if (screen !== "chat" || ollamaStatus !== "idle") return;
+    if ((screen !== "chat" && screen !== "synthetic") || ollamaStatus !== "idle") return;
     void refreshModels();
   }, [ollamaStatus, refreshModels, screen]);
 
@@ -233,6 +331,17 @@ function App() {
       showToast("Genereer eerst alle vervangers voordat je kopieert");
       return;
     }
+    const invalid = syntheticEntries
+      .map((entry) => ({
+        entry,
+        result: validateSyntheticValue(entry.replacement, settings.syntheticLocale),
+      }))
+      .find(({ result }) => !result.ok);
+    if (invalid && !invalid.result.ok) {
+      setAiError(`${invalid.entry.token}: ${invalid.result.reason}`);
+      showToast("Kopiëren geblokkeerd: onveilige synthetische waarde");
+      return;
+    }
     await clipboard.copy(
       syntheticOutput,
       `${syntheticEntries.length} synthetische vervangers gekopieerd`,
@@ -250,6 +359,14 @@ function App() {
       showToast("Genereer eerst volledige synthetische output");
       return;
     }
+    const invalid = syntheticEntries
+      .map((entry) => validateSyntheticValue(entry.replacement, settings.syntheticLocale))
+      .find((result) => !result.ok);
+    if (invalid && !invalid.ok) {
+      setAiError(invalid.reason);
+      showToast("Chatcontext geblokkeerd: onveilige synthetische waarde");
+      return;
+    }
     setChatContext(syntheticOutput);
     showToast("Synthetische output als chatcontext toegevoegd");
   };
@@ -257,6 +374,12 @@ function App() {
   const sendChat = async () => {
     const question = chatInput.trim();
     if (!question || chatBusy) return;
+    if (ollamaStatus === "ready" && !chatModelInstalled) {
+      setChatError(
+        `Het geselecteerde chatmodel ${settings.chatModel} is niet lokaal geïnstalleerd. Kies een ander model in Instellingen.`,
+      );
+      return;
+    }
     const now = Date.now();
     const rateError = getChatRateLimitMessage(chatSentAt, now);
     if (rateError) {
@@ -298,7 +421,7 @@ function App() {
     let answer = "";
     try {
       await chatWithOllama(
-        activeModel?.name ?? PRIMARY_OLLAMA_MODEL,
+        settings.chatModel,
         requestMessages,
         { numCtx: CHAT_MAX_CONTEXT_TOKENS, numPredict: CHAT_MAX_OUTPUT_TOKENS },
         (progress) => {
@@ -460,7 +583,7 @@ function App() {
             <ChatPanel
               messages={chatMessages}
               input={chatInput}
-              model={activeModel?.label ?? "Geen lokaal model"}
+              model={settings.chatModel}
               contextAttached={Boolean(chatContext)}
               contextLength={chatContext.length}
               rateStatus={`${chatSentAt.filter((timestamp) => Date.now() - timestamp < CHAT_RATE_WINDOW_MS).length}/${CHAT_MAX_REQUESTS_PER_WINDOW} vragen deze minuut`}
@@ -500,8 +623,12 @@ function App() {
           pullBusy={pullBusy}
           pullProgress={pullProgress}
           hardwareInfo={hardwareInfo}
+          replacementModel={settings.replacementModel}
+          chatModel={settings.chatModel}
           onLocaleChange={(value) => updateSettings({ syntheticLocale: value })}
           onClipboardClearAfterChange={(value) => updateSettings({ clipboardClearAfter: value })}
+          onReplacementModelChange={(value) => updateSettings({ replacementModel: value })}
+          onChatModelChange={(value) => updateSettings({ chatModel: value })}
           onRefreshModels={() => void refreshModels()}
           onDownloadModelChange={setDownloadModel}
           onPullModel={() => void pullModel()}
